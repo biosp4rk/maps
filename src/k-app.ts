@@ -373,7 +373,6 @@ export class KApp extends LitElement {
     this.fetchData();
   }
 
-  // TODO: use css instead of nbsp
   render() {
     return html`
       <div>

@@ -1,4 +1,5 @@
 import { css, customElement, html, LitElement, property } from 'lit-element';
+import { getHexVal } from './utils';
 
 /**
  * Renders a table.
@@ -167,7 +168,7 @@ export class KTable extends LitElement {
     }
   }
 
-  private maybeSort(e: Event) {
+  private trySort(e: Event) {
     const columnHeadings = ['Address', 'Value', 'Offset', 'Description'];
     const columnKeys = ['addr', 'val', 'offset', 'desc'];
     const labelEl =
@@ -187,27 +188,22 @@ export class KTable extends LitElement {
       let key = columnKeys[keyIndex];
       this.sortFn =
         (a: { [key: string]: unknown }, b: { [key: string]: unknown }) => {
-          if (key == 'addr') {
-            if (parseInt(
-              (a[key] as { [key: string]: string })[this.version], 16) <
-              parseInt(
-                (b[key] as
-                  { [key: string]: string })[this.version as string],
-                16)) {
+          if (key == 'addr' || key == 'offset' || key == 'val') {
+            const left = getHexVal(a[key] as string | { [key: string]: string }, this.version);
+            const right = getHexVal(b[key] as string | { [key: string]: string }, this.version);
+            if (left < right) {
               return this.sortAscending ? -1 : 1;
-            } else if (
-              parseInt(
-                (a[key] as { [key: string]: string })[this.version], 16) >
-              parseInt(
-                (b[key] as { [key: string]: string })[this.version], 16)) {
+            } else if (left > right) {
               return this.sortAscending ? 1 : -1;
             } else {
               return 0;
             }
           } else {
-            if ((a[key] as string) < (b[key] as string)) {
+            const left = a[key] as string;
+            const right = b[key] as string;
+            if (left < right) {
               return this.sortAscending ? -1 : 1;
-            } else if ((a[key] as string) > (b[key] as string)) {
+            } else if (left > right) {
               return this.sortAscending ? 1 : -1;
             } else {
               return 0;
@@ -224,12 +220,11 @@ export class KTable extends LitElement {
     return html`
       <div id="table">
         <div id="heading-row">
-          ${
-      this.getHeadings(this.maptype)
+          ${this.getHeadings(this.maptype)
         .map(
           (heading, index) => html`
               <span class="heading ${this.getClasses()[index]}"
-                    @click="${this.maybeSort}">
+                    @click="${this.trySort}">
                 <span class="label">
                   ${heading}
                 </span>
@@ -239,8 +234,7 @@ export class KTable extends LitElement {
               </span>`)}
         </div>
         <div>
-          ${
-      this.getData(this.sortFn)
+          ${this.getData(this.sortFn)
         .map((item: { [key: string]: unknown }, index: number) => {
           return html`<k-row
                   .maptype="${this.maptype}"

@@ -1,4 +1,5 @@
 import { css, customElement, html, LitElement, property } from 'lit-element';
+import { GameVal, getHexVal } from './utils';
 
 /**
  * Renders a single row in a table.
@@ -162,13 +163,10 @@ export class KRow extends LitElement {
     return 'count' in this.data ? parseInt(this.data.count as string, 16) : 1;
   }
 
-  private getSize() {
-    let size;
+  private getSize() : number {
+    let size : number;
     if (this.data.size) {
-      if (typeof size == 'object') {
-        size = size[this.version];
-      }
-      size = parseInt(this.data.size as string, 16);
+      size = getHexVal(this.data.size as GameVal, this.version);
     } else {
       let type = (this.data.type as string).split('.')[0];
       switch (type) {
@@ -191,7 +189,8 @@ export class KRow extends LitElement {
           size = 32;
           break;
         default:
-          size = parseInt((this.structs[type] as { size: string }).size, 16);
+          const struct = this.structs[type] as { size: GameVal }
+          size = getHexVal(struct.size, this.version);
           break;
       }
     }

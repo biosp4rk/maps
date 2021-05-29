@@ -110,7 +110,7 @@ let KTable = class KTable extends LitElement {
             let key = columnKeys[keyIndex];
             this.sortFn =
                 (a, b) => {
-                    if (key == 'addr') {
+                    if (key == 'addr' || key == 'offset' || key == 'val') {
                         if (parseInt(a[key][this.version], 16) <
                             parseInt(b[key][this.version], 16)) {
                             return this.sortAscending ? -1 : 1;
