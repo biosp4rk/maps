@@ -14,8 +14,8 @@ export class MapApp extends LitElement {
     }
 
     h1 {
-      text-align: center;
       background: #202020;
+      text-align: center;
       margin: 0;
     }
 
@@ -40,25 +40,25 @@ export class MapApp extends LitElement {
       color: white;
     }
 
-    label,
-    input {
+    input,
+    label {
       position: relative;
       display: inline-block;
       box-sizing: border-box;
       width: 170px;
-      /** 170 - 115 left position below */
+      /* 170 - 115 left position below */
       padding-right: 55px;
     }
 
     label::after {
       content: attr(data-results);
+      display: block;
       position: absolute;
-      top: 4px;
-      right: 4px;
       font-family: verdana, sans-serif;
       font-size: 12px;
-      display: block;
       font-weight: bold;
+      right: 4px;
+      top: 4px;
     }
   `;
 
