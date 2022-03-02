@@ -1,5 +1,5 @@
-
-import "./map-table";import { css, customElement, html, LitElement, property } from 'lit-element';
+import { css, customElement, html, LitElement, property } from 'lit-element';
+import "./map-table";
 import { GameVal, getHexVal } from './utils';
 
 /**
@@ -82,7 +82,7 @@ export class MapRow extends LitElement {
     }
 
     .highlight {
-      background-color: lightblue;
+      background-color: steelblue;
     }
 
     .desc,
@@ -125,13 +125,13 @@ export class MapRow extends LitElement {
     if (key == 'enum') {
       this.expanded = true;
     }
-    await this.requestUpdate();
+    await this.updateComplete;
     let element = this.shadowRoot?.querySelector('.' + key)! as HTMLElement;
     if (shouldScroll) {
       // Account for the sticky header.
-      const yOffset = -155;
+      const yOffset = 140;
       const y =
-        element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        element.getBoundingClientRect().top + window.pageYOffset - yOffset;
       window.scrollTo({ top: y, behavior: 'smooth' });
     }
     element.classList.add('highlight');
@@ -140,7 +140,7 @@ export class MapRow extends LitElement {
   async highlightSubTable(
     result: { row: number[], key: string }, shouldScroll: boolean) {
     this.expanded = true;
-    await this.requestUpdate();
+    await this.updateComplete;
     let table = this.shadowRoot?.querySelector('map-table')!;
     table.highlight(result, shouldScroll);
   }
@@ -324,7 +324,7 @@ export class MapRow extends LitElement {
         <span>
           ${this.data.params ?
             (this.data.params as object[])
-              .map((param) => this.renderCodeVar(param)) :
+              .map(param => this.renderCodeVar(param)) :
               'void'}
         </span>
       </div>

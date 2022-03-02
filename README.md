@@ -1,4 +1,4 @@
-# LitElement TypeScript starter
+# GBA Metroid Maps
 
 This project includes a sample component using LitElement with TypeScript.
 

@@ -1,5 +1,5 @@
-
-import "./map-table";import { css, customElement, html, LitElement, property } from 'lit-element';
+import { css, customElement, html, LitElement, property } from 'lit-element';
+import "./map-table";
 
 /**
  * Renders the application.
@@ -21,7 +21,7 @@ export class MapApp extends LitElement {
     }
 
     #page {
-      padding-bottom: 30px
+      padding-bottom: 40px
     }
 
     #banner {
@@ -234,7 +234,7 @@ export class MapApp extends LitElement {
       this.totalResults = 0;
       return;
     }
-    // Fuck deep copies of objects with arrays.
+    // deep copies of objects with arrays
     let storage = Object.assign({}, result);
     storage.row = storage.row.slice();
     this.seenResults.push(storage);
@@ -248,67 +248,64 @@ export class MapApp extends LitElement {
     rowStart: number[]): Generator<{ row: number[], key: string }> {
     for (let i = 0; i < data.length; i++) {
       let row = data[i] as { [key: string]: unknown };
-      let keys = Object.keys(row);
-      // Remove "label" since it's not shown to users.
-      let indexLabel = keys.findIndex((v) => v == 'label');
-      if (indexLabel != -1) {
-        keys.splice(indexLabel, 1);
-      }
-      // Remove "enum" since the values aren't shown to users.
-      indexLabel = keys.findIndex((v) => v == 'enum');
-      if (indexLabel != -1) {
-        keys.splice(indexLabel, 1);
-      }
-      // Remove 'type' key matches, since those point to structs.
-      indexLabel = keys.findIndex((v) => v == 'type');
-      if (indexLabel != -1) {
-        keys.splice(indexLabel, 1);
-      }
 
+      // get fields we want to search
+      let keys = Object.keys(row);
+      const toRemove = ['label', 'enum', 'type', 'count', 'size', 'offset'];
+      keys = keys.filter(k => !toRemove.includes(k));
+
+      // get searchable string for each field's value
       rowStart.push(i);
       for (let j = 0; j < keys.length; j++) {
-        let thisKey = keys[j];
-        let searchable = (row[(thisKey as string)] as string);
-        if (!searchable && ['params', 'return'].includes(thisKey)) {
-          searchable = 'void';
+        const thisKey = keys[j];
+        let searchable = row[thisKey] as string;
+        switch (thisKey) {
+          case 'params':
+            if (row[thisKey] === null) {
+              searchable = 'void';
+            } else {
+              let params = row[thisKey] as Array<{ [key: string]: unknown }>;
+              searchable = params.map(p => p.desc).join(',');
+            }
+            break;
+          case 'return':
+            if (row[thisKey] === null) {
+              searchable = 'void';
+            } else {
+              let ret = row[thisKey] as { [key: string]: unknown };
+              searchable = ret.desc as string;
+            }
+            break;
+          case 'addr':
+            if (typeof row[thisKey] == 'object') {
+              searchable = (row[thisKey] as { [key: string]: string })[this.version];
+            }
+            break;
         }
-        if (thisKey == 'params' && Array.isArray(row[(thisKey)])) {
-          // Params is actually an array, but we render it as
-          // a single cell, so go ahead and re-join it to
-          // search over the string.
-          searchable = (searchable as unknown as string[]).join(',');
-        }
-        if ((thisKey == 'size' && typeof row[thisKey] == 'object') ||
-          (thisKey == 'count' && typeof row[thisKey] == 'object') ||
-          thisKey == 'addr') {
-          searchable =
-            (searchable as unknown as
-              ({ [key: string]: string }))[this.version];
-        }
+
+        // check if query is in the searchable string
         if (searchable.toLowerCase().indexOf(query.toLowerCase()) != -1) {
           // This has the search term!
           yield { row: rowStart, key: thisKey };
         }
-        if (thisKey == 'desc' &&
-          ('enum' in row || row.type as string in this.structs)) {
-          let isEnum = 'enum' in row;
-          let expandName = isEnum ? row.enum as string : row.type as string;
-          if (isEnum) {
-            yield*
-              this.search(
-                query,
-                this.enums[expandName] as Array<{ [key: string]: unknown }>,
-                rowStart);
-          } else {
-            yield*
-              this.search(
-                query,
-                (this.structs[expandName] as { [key: string]: unknown })
-                  .vars as Array<{ [key: string]: unknown }>,
-                rowStart);
-          }
-        }
       }
+
+      // search enum or struct
+      if ('enum' in row) {
+        const name = row.enum as string;
+        yield* this.search(
+          query,
+          this.enums[name] as Array<{ [key: string]: unknown }>,
+          rowStart);
+      } else if (row.type as string in this.structs) {
+          const name = row.type as string;
+          yield* this.search(
+            query,
+            (this.structs[name] as { [key: string]: unknown })
+              .vars as Array<{ [key: string]: unknown }>,
+            rowStart);
+      }
+      
       rowStart.pop();
     }
   }

@@ -173,9 +173,9 @@ export class MapTable extends LitElement {
     const sortEl =
       (e.target as HTMLElement).parentElement?.querySelector('.sort')! as
       HTMLElement;
-    // Are we sorting by increasing or decreasing?
+    // are we sorting by increasing or decreasing?
     if (sortEl.textContent?.trim()) {
-      // Previously sorted, flip direction.
+      // previously sorted, flip direction
       this.sortAscending = !this.sortAscending;
     }
     if (columnHeadings.includes(labelEl.innerText.trim())) {
