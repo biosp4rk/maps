@@ -69,9 +69,9 @@ export class MapApp extends LitElement {
 
   @property({ type: Array }) data: Array<{ [key: string]: unknown }> = [];
 
-  @property({ type: Number }) resultCount = 0;
+  @property({ type: Number }) resultIndex = 0;
 
-  @property({ type: Number }) totalResults = 0;
+  @property({ type: Number }) resultCount = 0;
 
   @property({ type: Boolean }) noResults = false;
 
@@ -131,6 +131,10 @@ export class MapApp extends LitElement {
     if (!this.game || !this.version || !this.map) {
       return;
     }
+    if (this.resultIndex > 0) {
+      this.clearPreviousSearch(true);
+    }
+
     this.fetchingData = true;
     const targetBaseUrl = `/json/${this.game}/`;
     this.enums = await fetch(targetBaseUrl + 'enums.json')
@@ -162,27 +166,27 @@ export class MapApp extends LitElement {
     this.clearPreviousSearch(false);
     const gen = this.search(query, this.getVersionedData(), []);
     let result = gen.next().value;
-    let resultCount = 0;
+    let resultIndex = 0;
     while (result) {
-      resultCount++;
+      resultIndex++;
       if (highlight) {
         this.shadowRoot?.querySelector('map-table')!.highlight(
-          result, resultCount == 1);
+          result, resultIndex == 1);
       }
       result = gen.next().value;
     }
-    if (highlight && resultCount) {
-      this.resultCount = 1;
-      this.totalResults = resultCount;
+    if (highlight && resultIndex) {
+      this.resultIndex = 1;
+      this.resultCount = resultIndex;
     }
-    return resultCount;
+    return resultIndex;
   }
 
   private clearPreviousSearch(clearInput: boolean = true) {
     if (clearInput) {
       this.shadowRoot!.querySelector('input')!.value = '';
+      this.resultIndex = 0;
       this.resultCount = 0;
-      this.totalResults = 0;
       this.seenResults = [];
     }
     this.noResults = false;
@@ -201,23 +205,23 @@ export class MapApp extends LitElement {
     this.clearPreviousSearch(false);
     if (query != this.query) {
       this.query = query;
-      this.resultCount = 0;
-      this.totalResults = this.findAll(query, false);
+      this.resultIndex = 0;
+      this.resultCount = this.findAll(query, false);
       this.generator = this.search(query, this.getVersionedData(), []);
       this.seenResults = [];
     }
-    if (!forward && this.seenResults.length && this.resultCount > 0) {
+    if (!forward && this.seenResults.length && this.resultIndex > 0) {
       // go backwards to previous result
-      this.resultCount = this.resultCount - 1;
-      let result = this.seenResults[this.resultCount - 1];
+      this.resultIndex = this.resultIndex - 1;
+      let result = this.seenResults[this.resultIndex - 1];
       this.shadowRoot?.querySelector('map-table')!.highlight(result);
       await Promise.resolve();
       return;
     }
-    if (this.resultCount < this.seenResults.length) {
+    if (this.resultIndex < this.seenResults.length) {
       // forwards through already generated results
-      this.resultCount++;
-      let result = this.seenResults[this.resultCount - 1];
+      this.resultIndex++;
+      let result = this.seenResults[this.resultIndex - 1];
       this.shadowRoot?.querySelector('map-table')!.highlight(result);
       await Promise.resolve();
       return;
@@ -225,20 +229,20 @@ export class MapApp extends LitElement {
     const result = this.generator!.next().value;
     if (!result) {
       // if there were never any results, note that
-      if (!this.resultCount) {
+      if (!this.resultIndex) {
         this.noResults = true;
       }
       this.query = '';
       this.generator = undefined;
+      this.resultIndex = 0;
       this.resultCount = 0;
-      this.totalResults = 0;
       return;
     }
     // deep copies of objects with arrays
     let storage = Object.assign({}, result);
     storage.row = storage.row.slice();
     this.seenResults.push(storage);
-    this.resultCount = this.resultCount + 1;
+    this.resultIndex = this.resultIndex + 1;
     // highlight that result
     this.shadowRoot?.querySelector('map-table')!.highlight(result);
   }
@@ -251,8 +255,8 @@ export class MapApp extends LitElement {
 
       // get fields we want to search
       let keys = Object.keys(row);
-      const toRemove = ['label', 'enum', 'type', 'count', 'size', 'offset'];
-      keys = keys.filter(k => !toRemove.includes(k));
+      const toSearch = ['desc', 'addr', 'params', 'return'];
+      keys = keys.filter(k => toSearch.includes(k));
 
       // get searchable string for each field's value
       rowStart.push(i);
@@ -341,12 +345,12 @@ export class MapApp extends LitElement {
   }
 
   private getRenderedResultsCount(
-    resultCount: number, totalResults: number, noResults: boolean) {
+    resultIndex: number, resultCount: number, noResults: boolean) {
     if (noResults) {
       // Render 0 of 0
-      return resultCount + ' of ' + totalResults;
+      return resultIndex + ' of ' + resultCount;
     }
-    return resultCount ? resultCount + ' of ' + totalResults : ''
+    return resultIndex ? resultIndex + ' of ' + resultCount : ''
   }
 
   private gameChangeHandler() {
@@ -391,7 +395,7 @@ export class MapApp extends LitElement {
           <p>
             Search:
             <label data-results="${this.getRenderedResultsCount(
-              this.resultCount, this.totalResults, this.noResults)}">
+              this.resultIndex, this.resultCount, this.noResults)}">
               <input @keyup='${this.inputHandler}'/>
             </label>
             <button @click="${this.searchButtonHandler}">Find</button>
