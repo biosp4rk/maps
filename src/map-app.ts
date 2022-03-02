@@ -132,7 +132,7 @@ export class MapApp extends LitElement {
       return;
     }
     this.fetchingData = true;
-    const targetBaseUrl = `/json/${this.game}/`;
+    const targetBaseUrl = `/maps2/json/${this.game}/`;
     this.enums = await fetch(targetBaseUrl + 'enums.json')
       .then(response => response.json());
     this.structs = await fetch(targetBaseUrl + 'structs.json')
@@ -379,13 +379,16 @@ export class MapApp extends LitElement {
         <div id="banner">
           <p>
             <select id="game-select" @change="${this.gameChangeHandler}">
-              ${this.getGames().map(game => html`<option value="${game.value}" ?selected="${this.game == game.value}">${game.label}</option>`)}
+              ${this.getGames().map(game =>
+                html`<option value="${game.value}" ?selected="${this.game == game.value}">${game.label}</option>`)}
             </select>
             <select id="map-select" @change="${this.mapChangeHandler}">
-                ${this.getMaps().map(map => html`<option value="${map.value}" ?selected="${this.map == map.value}">${map.label}</option>`)}
+                ${this.getMaps().map(map =>
+                  html`<option value="${map.value}" ?selected="${this.map == map.value}">${map.label}</option>`)}
             </select>
             <select id="version-select" @change="${this.versionChangeHandler}">
-              ${this.getVersions().map(version => html`<option value="${version}" ?selected="${this.version == version}">${version}</option>`)}
+              ${this.getVersions().map(version =>
+                html`<option value="${version}" ?selected="${this.version == version}">${version}</option>`)}
             </select>
           </p>
           <p>

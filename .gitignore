@@ -3,6 +3,9 @@
 /test/
 custom-elements.json
 
+/app.js
+/app.js.map
+
 /map-app.js
 /map-app.js.map
 /map-app.d.ts
