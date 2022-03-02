@@ -1,4 +1,5 @@
-import { css, customElement, html, LitElement, property } from 'lit-element';
+
+import "./map-table";import { css, customElement, html, LitElement, property } from 'lit-element';
 import { GameVal, getHexVal } from './utils';
 
 /**
@@ -38,6 +39,10 @@ export class MapRow extends LitElement {
       transition: background-color .5s linear;
     }
 
+    p {
+      margin: 0px 0px 3px 0px;
+    }
+
     .size {
       flex: none;
       text-align: right;
@@ -53,6 +58,12 @@ export class MapRow extends LitElement {
     .addr,
     .offset {
       text-align: right;
+    }
+
+    .type {
+      font-family: "Courier New", monospace;
+      font-size: 14px;
+      margin: 0;
     }
 
     .val,
@@ -78,10 +89,6 @@ export class MapRow extends LitElement {
     .params,
     .return {
       flex: 1;
-    }
-
-    .param {
-      margin: 0;
     }
   `;
 
@@ -170,6 +177,7 @@ export class MapRow extends LitElement {
         case 'u8':
         case 's8':
         case 'flags8':
+        case 'bool':
           size = 1;
           break;
         case 'u16':
@@ -195,7 +203,7 @@ export class MapRow extends LitElement {
   }
 
   private getTooltip() {
-    if (['code', 'sprite_ai'].includes(this.maptype)) {
+    if (this.maptype === 'code') {
       return `Ends at ${
         this.toHex(this.getAddr() + this.getLength() - 1)}`
     }
@@ -207,11 +215,11 @@ export class MapRow extends LitElement {
       }
       return '';
     } else {
-      return 'Address: ' + this.getOffsetAddress();
+      return 'Address: ' + this.getOffsetAddr();
     }
   }
 
-  private getOffsetAddress() {
+  private getOffsetAddr() {
     let off = parseInt(this.data.offset as string, 16);
     return this.toHex(parseInt(this.parentAddress, 16) + off);
   }
@@ -233,12 +241,12 @@ export class MapRow extends LitElement {
       this.data.type as string;
   }
 
-  private getData() {
+  private getData(): { [key: string]: unknown }[] {
     if (this.isExpandEnum()) {
-      return this.enums[this.getExpandName()];
+      return this.enums[this.getExpandName()] as { [key: string]: unknown }[];
     }
     return (this.structs[this.getExpandName()] as { [key: string]: unknown })
-      .vars;
+      .vars as { [key: string]: unknown }[];
   }
 
   private getAddr(): number {
@@ -263,6 +271,15 @@ export class MapRow extends LitElement {
       return 'addr';
     }
     return 'offset';
+  }
+
+  private renderCodeVar(codeVar: object) {
+    const cv = codeVar as { [index: string]: string };
+    const t = cv.type.split('.')[0]
+    return html`<p>
+      <span class="type">${t}</span>
+      <span>${cv.desc}</span>
+    </p>`;
   }
 
   override render() {
@@ -296,29 +313,26 @@ export class MapRow extends LitElement {
               .enums="${this.enums}"
               .parentAddress="${
           this.version ? this.getAddrStr() :
-            this.getOffsetAddress()}">
+            this.getOffsetAddr()}">
             </map-table>` :
           ''}
       </div>
       ${
-        ['code', 'sprite_ai'].includes(this.maptype) ?
+        this.maptype === 'code' ?
           html`
       <div class="params">
         <span>
-          ${
-            this.data.params ?
-              (this.data.params as string[])
-                .map((param, index) =>
-                  `${index < 4 ?
-                    `r${index}` :
-                    `sp[${((index - 4) * 4).toString(16).toUpperCase()}]`}: ${param}`)
-                .map((s) => html`<p class="param">${s}</p>`) :
+          ${this.data.params ?
+            (this.data.params as object[])
+              .map((param) => this.renderCodeVar(param)) :
               'void'}
         </span>
       </div>
       <div class="return">
         <span>
-          ${this.data.return || 'void'}
+          ${this.data.return ?
+            this.renderCodeVar(this.data.return as object) :
+            'void'}
         </span>
       </div>` :
           ''}

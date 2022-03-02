@@ -1,4 +1,6 @@
+
 import { css, customElement, html, LitElement, property } from 'lit-element';
+import "./map-row";
 import { getHexVal } from './utils';
 
 /**
@@ -37,7 +39,7 @@ export class MapTable extends LitElement {
 
     #table {
       margin: auto;
-      max-width: 800px;
+      max-width: 90%;
     }
 
     #heading-row {
@@ -67,7 +69,7 @@ export class MapTable extends LitElement {
   /**
    * The JSON data to render.
    */
-  @property({ type: Array }) data = [];
+  @property({ type: Array }) data: Array<{ [key: string]: unknown }> = [];
 
   @property({ type: Object }) structs = {};
 
@@ -79,7 +81,7 @@ export class MapTable extends LitElement {
 
   @property({ type: String }) parentAddress = '';
 
-  @property({ type: Function }) sortFn?: ((a: any, b: any) => number) | undefined;
+  @property({ type: Object }) sortFn?: ((a: any, b: any) => number) | undefined;
 
   @property({ type: Boolean, reflect: true }) sortAscending = true;
 
@@ -102,7 +104,7 @@ export class MapTable extends LitElement {
   private getClasses() {
     if (this.version) {
       let classes = ['addr', 'size', 'desc'];
-      if (['code', 'sprite_ai'].includes(this.maptype)) {
+      if (this.maptype === 'code') {
         classes.push('params', 'return');
       }
       return classes;
@@ -139,7 +141,7 @@ export class MapTable extends LitElement {
   private getHeadings(mapType: string) {
     if (this.version) {
       let headings = ['Address', 'Length', 'Description'];
-      if (['code', 'sprite_ai'].includes(mapType)) {
+      if (mapType === 'code') {
         headings.push('Arguments', 'Returns');
       }
       return headings;
@@ -231,15 +233,15 @@ export class MapTable extends LitElement {
           ${this.getData(this.sortFn)
         .map((item: { [key: string]: unknown }, index: number) => {
           return html`<map-row
-                  .maptype="${this.maptype}"
-                  .data="${item}"
-                  .structs="${this.structs}"
-                  .enums="${this.enums}"
-                  .version="${this.version}"
-                  ?odd="${index % 2 == 0}"
-                  ?isEnum="${this.isEnum}"
-                  .parentAddress="${this.parentAddress}">
-                  </map-row>`;
+            .maptype="${this.maptype}"
+            .data="${item}"
+            .structs="${this.structs}"
+            .enums="${this.enums}"
+            .version="${this.version}"
+            ?odd="${index % 2 == 0}"
+            ?isEnum="${this.isEnum}"
+            .parentAddress="${this.parentAddress}">
+            </map-row>`;
         })}
         </div>
       </div>

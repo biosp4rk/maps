@@ -1,4 +1,5 @@
-import { css, customElement, html, LitElement, property } from 'lit-element';
+
+import "./map-table";import { css, customElement, html, LitElement, property } from 'lit-element';
 
 /**
  * Renders the application.
@@ -336,10 +337,6 @@ export class MapApp extends LitElement {
         value: 'code',
       },
       {
-        label: 'Sprite AI',
-        value: 'sprite_ai',
-      },
-      {
         label: 'ROM Data',
         value: 'data',
       },
@@ -371,7 +368,7 @@ export class MapApp extends LitElement {
   }
 
   private mapChangeHandler() {
-    // ram, code, sprite_ai, data
+    // ram, code, data
     this.map =
       (this.shadowRoot!.querySelector('#map-select')! as HTMLInputElement)
         .value;
