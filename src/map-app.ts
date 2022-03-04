@@ -9,7 +9,6 @@ export class MapApp extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      background-image: url("background.png");
       color: white;
       font-family: verdana, sans-serif;
     }
