@@ -73,8 +73,6 @@ export class MapApp extends LitElement {
 
   @property({ type: Number }) resultCount = 0;
 
-  @property({ type: Boolean }) noResults = false;
-
   @property({ type: String }) game = 'mf';
 
   @property({ type: String }) version = 'U';
@@ -163,20 +161,20 @@ export class MapApp extends LitElement {
     this.clearPrevHighlight();
     const gen = this.search(query, this.getVersionedData(), []);
     let result = gen.next().value;
-    let resultIndex = 0;
+    let index = 0;
     while (result) {
-      resultIndex++;
+      index++;
       if (highlight) {
+        // highlight the first result found
         this.shadowRoot?.querySelector('map-table')!.highlight(
-          result, resultIndex == 1);
+          result, index == 1);
       }
       result = gen.next().value;
     }
-    if (highlight && resultIndex) {
+    if (highlight && index) {
       this.resultIndex = 1;
-      this.resultCount = resultIndex;
     }
-    return resultIndex;
+    this.resultCount = index;
   }
 
   private clearPrevSearch() {
@@ -185,7 +183,6 @@ export class MapApp extends LitElement {
     this.resultIndex = 0;
     this.resultCount = 0;
     this.seenResults = [];
-    this.noResults = false;
     this.shadowRoot!.querySelector('input')!.value = '';
     this.clearPrevHighlight();
   }
@@ -207,7 +204,7 @@ export class MapApp extends LitElement {
     if (query != this.query) {
       this.query = query;
       this.resultIndex = 0;
-      this.resultCount = this.findAll(query, false);
+      this.findAll(query, false);
       this.generator = this.search(query, this.getVersionedData(), []);
       this.seenResults = [];
     }
@@ -229,17 +226,13 @@ export class MapApp extends LitElement {
     }
     const result = this.generator!.next().value;
     if (!result) {
-      // if there were never any results, note that
-      if (!this.resultIndex) {
-        this.noResults = true;
-      }
       this.query = '';
       this.generator = undefined;
       this.resultIndex = 0;
       this.resultCount = 0;
       return;
     }
-    // deep copies of objects with arrays
+    // deep copy of object with array
     let storage = Object.assign({}, result);
     storage.row = storage.row.slice();
     this.seenResults.push(storage);
@@ -290,18 +283,19 @@ export class MapApp extends LitElement {
 
         // check if query is in the searchable string
         if (searchable.toLowerCase().indexOf(query.toLowerCase()) != -1) {
-          // This has the search term!
           yield { row: rowStart, key: thisKey };
         }
       }
 
       // search enum or struct
       if ('enum' in row) {
+        /* skip this by default for now
         const name = row.enum as string;
         yield* this.search(
           query,
           this.enums[name] as Array<{ [key: string]: unknown }>,
           rowStart);
+        */
       } else if (row.type as string in this.structs) {
           const name = row.type as string;
           yield* this.search(
@@ -345,12 +339,7 @@ export class MapApp extends LitElement {
     ];
   }
 
-  private getRenderedResultsCount(
-    resultIndex: number, resultCount: number, noResults: boolean) {
-    if (noResults) {
-      // Render 0 of 0
-      return resultIndex + ' of ' + resultCount;
-    }
+  private getRenderedResultsCount(resultIndex: number, resultCount: number) {
     return resultIndex ? resultIndex + ' of ' + resultCount : ''
   }
 
@@ -402,7 +391,7 @@ export class MapApp extends LitElement {
           <p>
             Search:
             <label data-results="${this.getRenderedResultsCount(
-              this.resultIndex, this.resultCount, this.noResults)}">
+              this.resultIndex, this.resultCount)}">
               <input @keyup='${this.inputHandler}'/>
             </label>
             <button @click="${this.searchButtonHandler}">Find</button>
