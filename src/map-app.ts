@@ -94,7 +94,7 @@ export class MapApp extends LitElement {
     this.fetchData();
     document.body.addEventListener('keyup', (e: Event) => {
       if ((e as KeyboardEvent).key == 'Escape') {
-        this.clearPreviousSearch(false);
+        this.clearPrevHighlight();
       }
     })
   }
@@ -131,9 +131,6 @@ export class MapApp extends LitElement {
     if (!this.game || !this.version || !this.map) {
       return;
     }
-    if (this.resultIndex > 0) {
-      this.clearPreviousSearch(true);
-    }
 
     this.fetchingData = true;
     const targetBaseUrl = `/json/${this.game}/`;
@@ -163,7 +160,7 @@ export class MapApp extends LitElement {
   }
 
   private findAll(query: string, highlight = true) {
-    this.clearPreviousSearch(false);
+    this.clearPrevHighlight();
     const gen = this.search(query, this.getVersionedData(), []);
     let result = gen.next().value;
     let resultIndex = 0;
@@ -182,14 +179,18 @@ export class MapApp extends LitElement {
     return resultIndex;
   }
 
-  private clearPreviousSearch(clearInput: boolean = true) {
-    if (clearInput) {
-      this.shadowRoot!.querySelector('input')!.value = '';
-      this.resultIndex = 0;
-      this.resultCount = 0;
-      this.seenResults = [];
-    }
+  private clearPrevSearch() {
+    this.query = '';
+    this.generator = undefined;
+    this.resultIndex = 0;
+    this.resultCount = 0;
+    this.seenResults = [];
     this.noResults = false;
+    this.shadowRoot!.querySelector('input')!.value = '';
+    this.clearPrevHighlight();
+  }
+
+  private clearPrevHighlight() {
     this.shadowRoot!.querySelector('map-table')!.clearHighlights();
   }
 
@@ -202,7 +203,7 @@ export class MapApp extends LitElement {
       return;
     }
 
-    this.clearPreviousSearch(false);
+    this.clearPrevHighlight();
     if (query != this.query) {
       this.query = query;
       this.resultIndex = 0;
@@ -219,7 +220,7 @@ export class MapApp extends LitElement {
       return;
     }
     if (this.resultIndex < this.seenResults.length) {
-      // forwards through already generated results
+      // go forwards through already generated results
       this.resultIndex++;
       let result = this.seenResults[this.resultIndex - 1];
       this.shadowRoot?.querySelector('map-table')!.highlight(result);
@@ -358,6 +359,7 @@ export class MapApp extends LitElement {
     this.game =
       (this.shadowRoot!.querySelector('#game-select')! as HTMLInputElement)
         .value;
+    this.clearPrevSearch();
     this.fetchData();
   }
 
@@ -366,6 +368,7 @@ export class MapApp extends LitElement {
     this.version =
       (this.shadowRoot!.querySelector('#version-select')! as HTMLInputElement)
         .value;
+    this.clearPrevSearch();
   }
 
   private mapChangeHandler() {
@@ -373,6 +376,7 @@ export class MapApp extends LitElement {
     this.map =
       (this.shadowRoot!.querySelector('#map-select')! as HTMLInputElement)
         .value;
+    this.clearPrevSearch();
     this.fetchData();
   }
 
@@ -400,7 +404,7 @@ export class MapApp extends LitElement {
             </label>
             <button @click="${this.searchButtonHandler}">Find</button>
             <button @click="${this.findAllButtonHandler}">Find All</button>
-            <button @click="${this.clearPreviousSearch}">Clear Results</button>
+            <button @click="${this.clearPrevSearch}">Clear Results</button>
             <button @click="${this.collapseAll}">Collapse All</button>
           </p>
         </div>
