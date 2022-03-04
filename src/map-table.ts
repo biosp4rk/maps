@@ -39,7 +39,6 @@ export class MapTable extends LitElement {
 
     #table {
       margin: auto;
-      max-width: 90%;
     }
 
     #heading-row {
@@ -49,6 +48,12 @@ export class MapTable extends LitElement {
     :host(#first) #heading-row {
       background: #101010;
       border: 1px solid #808080;
+    }
+
+    :host(#first) #table {
+      background: #101010;
+      border: 1px solid #808080;
+      max-width: 90%;
     }
 
     .desc,
