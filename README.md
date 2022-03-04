@@ -1,6 +1,6 @@
-# GBA Metroid Maps
+# GBA Metroid Data Maps
 
-This project includes a sample component using LitElement with TypeScript.
+Source code for app at labk.org/maps
 
 ## Setup
 

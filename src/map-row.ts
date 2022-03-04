@@ -1,6 +1,6 @@
 import { css, customElement, html, LitElement, property } from 'lit-element';
 import "./map-table";
-import { GameVal, getHexVal } from './utils';
+import { GameVal, getHexVal, getPrimSize, getPrimName } from './utils';
 
 /**
  * Renders a single row in a table.
@@ -40,7 +40,7 @@ export class MapRow extends LitElement {
     }
 
     p {
-      margin: 0px 0px 3px 0px;
+      margin: 0 0 3px 0;
     }
 
     .size {
@@ -61,9 +61,10 @@ export class MapRow extends LitElement {
     }
 
     .type {
+      cursor: help;
       font-family: "Courier New", monospace;
       font-size: 14px;
-      margin: 0;
+      margin: 0 2px 0 0;
     }
 
     .val,
@@ -168,38 +169,15 @@ export class MapRow extends LitElement {
   }
 
   private getSize() : number {
-    let size : number;
     if (this.data.size) {
-      size = getHexVal(this.data.size as GameVal, this.version);
-    } else {
-      let type = (this.data.type as string).split('.')[0];
-      switch (type) {
-        case 'u8':
-        case 's8':
-        case 'flags8':
-        case 'bool':
-          size = 1;
-          break;
-        case 'u16':
-        case 's16':
-        case 'flags16':
-          size = 2;
-          break;
-        case 'u32':
-        case 's32':
-        case 'ptr':
-          size = 4;
-          break;
-        case 'palette':
-          size = 32;
-          break;
-        default:
-          const struct = this.structs[type] as { size: GameVal }
-          size = getHexVal(struct.size, this.version);
-          break;
-      }
+      return getHexVal(this.data.size as GameVal, this.version);
     }
-    return size;
+    let type = (this.data.type as string).split('.')[0];
+    if (type in this.structs) {
+      const struct = this.structs[type] as { size: GameVal }
+      return getHexVal(struct.size, this.version);
+    }
+    return getPrimSize(type);
   }
 
   private getTooltip() {
@@ -214,9 +192,8 @@ export class MapRow extends LitElement {
         return 'Size: ' + this.toHex(size) + '\nCount: ' + this.toHex(count);
       }
       return '';
-    } else {
-      return 'Address: ' + this.getOffsetAddr();
     }
+    return 'Address: ' + this.getOffsetAddr();
   }
 
   private getOffsetAddr() {
@@ -275,9 +252,10 @@ export class MapRow extends LitElement {
 
   private renderCodeVar(codeVar: object) {
     const cv = codeVar as { [index: string]: string };
-    const t = cv.type.split('.')[0]
+    const type = cv.type.split('.')[0]
+    const tip = getPrimName(type);
     return html`<p>
-      <span class="type">${t}</span>
+      <span class="type" title=${tip}>${type}</span>
       <span>${cv.desc}</span>
     </p>`;
   }
@@ -295,8 +273,8 @@ export class MapRow extends LitElement {
           ''}">${this.getAddrStr()}</span>
       </div>
       <div class="size">
-        <span class="${
-        this.version && !!this.getTooltip() ? 'has-tooltip' : ''}"
+        <span class="${this.version && !!this.getTooltip() ?
+                'has-tooltip' : ''}"
               title="${this.getTooltip()}">${
         this.toHex(this.getLength())}</span>
       </div>
