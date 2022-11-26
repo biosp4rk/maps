@@ -16,18 +16,22 @@ const GAMES = [
   }
 ];
 
+const MAP_RAM = 'ram';
+const MAP_CODE = 'code';
+const MAP_DATA = 'data';
+
 const MAPS = [
   {
     label: 'RAM',
-    value: 'ram',
+    value: MAP_RAM,
   },
   {
     label: 'ROM Code',
-    value: 'code',
+    value: MAP_CODE,
   },
   {
     label: 'ROM Data',
-    value: 'data',
+    value: MAP_DATA,
   }
 ];
 
@@ -158,11 +162,11 @@ export class MapApp extends LitElement {
   /** ? */
   @property({ type: Number }) resultCount = 0;
   /** ? */
-  @property({ type: String }) game = 'mf';
+  @property({ type: String }) game = GAMES[0].value;
   /** ? */
-  @property({ type: String }) version = 'U';
+  @property({ type: String }) version = VERSIONS[0];
   /** ? */
-  @property({ type: String }) map = 'ram';
+  @property({ type: String }) map = MAP_RAM;
   /** ? */
   @property({ type: Boolean }) fetchingData = false;
 
@@ -354,7 +358,6 @@ export class MapApp extends LitElement {
   }
 
   private mapChangeHandler() {
-    // ram, code, data
     this.map =
       (this.shadowRoot!.querySelector('#map-select')! as HTMLInputElement)
         .value;
@@ -397,9 +400,9 @@ export class MapApp extends LitElement {
 
   private getTableType(): TableType {
     switch(this.map) {
-      case 'ram': return TableType.RamList;
-      case 'data': return TableType.DataList;
-      case 'code': return TableType.CodeList;
+      case MAP_RAM: return TableType.RamList;
+      case MAP_DATA: return TableType.DataList;
+      case MAP_CODE: return TableType.CodeList;
       default: return TableType.None;
     }
   }
