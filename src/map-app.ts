@@ -170,7 +170,7 @@ export class MapApp extends LitElement {
   /** U, E, or J */
   @property({ type: String }) version = VERSIONS[0];
   /** ram, code, or data */
-  @property({ type: String }) map = MAP_RAM;
+  @property({ type: String }) map = MAPS[0].value;
   /** hide table while fetching data */
   @property({ type: Boolean }) fetchingData = false;
 
