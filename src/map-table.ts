@@ -1,12 +1,12 @@
-
 import { css, customElement, html, LitElement, property } from 'lit-element';
 import {
-  GameVar, GameAbsVar, GameRelVar, GameStructList, GameEnumList, GameCode, GameEnumVal, GameStruct
+  GameVar, GameAbsVar, GameRelVar, GameStructList,
+  GameEnumList, GameCode, GameEnumVal, GameStruct
 } from './entry-types';
 import { toHex } from './utils';
 import {
-  KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_DESC,
-  KEY_ARGS, KEY_RET, KEY_OFF, KEY_VAL, KEY_NOTES, getHeading
+  KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_ARGS,
+  KEY_RET, KEY_OFF, KEY_VAL, KEY_NOTES, CATEGORIES, getHeading
 } from './headings';
 
 export enum TableType {
@@ -17,21 +17,6 @@ export enum TableType {
   StructDef,
   EnumDef
 }
-
-// TODO: move?
-const CATEGORIES: { [key: string]: string } = {
-  'flags': 'Flags',
-  'ascii': 'ASCII',
-  'text': 'Text',
-  'rle': 'RLE',
-  'lz': 'LZ',
-  'gfx': 'Graphics',
-  'tilemap': 'Tilemap',
-  'palette': 'Palette',
-  'oamframe': 'OAM frame',
-  'thumb': 'THUMB',
-  'arm': 'ARM',
-};
 
 /** Renders a table */
 @customElement('map-table')
@@ -114,6 +99,7 @@ export class MapTable extends LitElement {
     .expand {
       color: #A0A0E0;
       cursor: pointer;
+      margin-left: 5px;
     }
 
     .main-table {
@@ -230,29 +216,23 @@ export class MapTable extends LitElement {
       title="${toolTip}">${len}</td>`;
   }
 
-  private renderSubTable(entry: GameVar, index: number) {
+  private hasSubTable(entry: GameVar) {
     const isEnum = Boolean(entry.enum) && entry.enum! in this.enums;
     const isStruct = entry.spec() in this.structs;
-    if (!(isEnum || isStruct)) {
-      return '';
-    }
-    const expanded = this.expandedRows.has(index);
-    const toggle = html`<span class="expand" data-idx="${index}"
-      @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`;
-    if (!expanded) {
-      return toggle;
-    }
-    let table;
+    return isEnum || isStruct;
+  }
+
+  private renderSubTable(entry: GameVar) {
     if (Boolean(entry.enum) && entry.enum! in this.enums) {
       const vals: GameEnumVal[] = this.enums[entry.enum!];
-      table = this.renderEnumEntry(vals);
+      return this.renderEnumEntry(vals);
     } else if (entry.spec() in this.structs) {
       const gs = this.structs[entry.spec()];
       const pa = this.parentAddr ?
         this.parentAddr : (entry as GameAbsVar).getAddr();
-      table = this.renderStructEntry(gs, pa);
+      return this.renderStructEntry(gs, pa);
     }
-    return html`${toggle}${table}`;
+    return '';
   }
 
   private renderLabel(label: string) {
@@ -260,6 +240,23 @@ export class MapTable extends LitElement {
       return '';
     }
     return html`<td class="label">${label}</td>`
+  }
+
+  private renderDesc(entry: GameVar, index: number) {
+    let toggle: any = '';
+    let table: any = '';
+    if (this.hasSubTable(entry)) {
+      const expanded = this.expandedRows.has(index);
+      toggle = html`<span class="expand" data-idx="${index}"
+        @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`;
+      if (expanded) {
+        table = this.renderSubTable(entry);
+      }
+    }
+    return html`<td class="desc">
+      <span class="desc-span">${entry.desc}${toggle}</span>
+      ${table}
+    </td>`;
   }
 
   private renderNotes(notes?: string) {
@@ -276,10 +273,7 @@ export class MapTable extends LitElement {
       ${this.renderTags(entry.tags)}
       ${this.renderType(entry.type)}
       ${this.renderLabel(entry.label)}
-      <td class="desc">
-        <span class="desc-span">${entry.desc}</span>
-        ${this.renderSubTable(entry, index)}
-      </td>
+      ${this.renderDesc(entry, index)}
       ${this.renderNotes(entry.notes)}
     </tr>`;
   }
@@ -341,10 +335,7 @@ export class MapTable extends LitElement {
       ${this.renderVarLength(entry)}
       ${this.renderType(entry.type)}
       ${this.renderLabel(entry.label)}
-      <td class="desc">
-        <span class="desc-span">${entry.desc}</span>
-        ${this.renderSubTable(entry, index)}
-      </td>
+      ${this.renderDesc(entry, index)}
       ${this.renderNotes(entry.notes)}
     </tr>`;
   }

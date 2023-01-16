@@ -1,7 +1,9 @@
 import { css, customElement, html, LitElement, property } from 'lit-element';
 import { TableType } from "./map-table";
 import { GameStructList, GameEnumList, GameStruct } from './entry-types';
-import { getHideableColumns, KEY_LABEL, KEY_TAGS, KEY_TYPE, KEY_ENUM, KEY_DESC } from './headings'
+import {
+  KEY_LABEL, KEY_TAGS, KEY_TYPE, KEY_ENUM, KEY_DESC, KEY_NOTES, getHideableColumns
+} from './headings'
 import { FilterItem, FilterParser, SearchType } from './filter-parser';
 
 const VERSIONS = ['U', 'E', 'J'];
@@ -119,10 +121,12 @@ export class MapApp extends LitElement {
       row-gap: 15px;
       column-gap: 15px;
     }
+    
     #selectors {
       grid-column: 1 / 3;
       grid-row: 1;
     }
+
     #filter {
       grid-column: 1;
       grid-row: 2;
@@ -130,20 +134,14 @@ export class MapApp extends LitElement {
     #filter-search {
       margin-bottom: 5px;
     }
-    #search-options {
+    #filter-options {
       grid-column: 2;
       grid-row: 2;
     }
+
     #page-nav {
       grid-column: 1 / 3;
       grid-row: 3;
-    }
-    #column-vis {
-      grid-column: 4;
-      grid-row: 1 / 5;
-    }
-
-    #page-nav {
       text-align: center;
     }
     #num-rows {
@@ -152,26 +150,32 @@ export class MapApp extends LitElement {
     #page-text {
       margin-left: 10px;
     }
+
+    #column-vis {
+      grid-column: 4;
+      grid-row: 1 / 5;
+    }
   `;
 
   /** game struct definitions */
   @property({ type: Object }) structs: GameStructList = {};
   /** game enum definitions */
   @property({ type: Object }) enums: GameEnumList = {};
-  /** game data to display */
+  /** all map data for game and region */
   @property({ type: Array }) allData: Array<{ [key: string]: unknown }> = [];
+  /** filtered map data to display */
   @property({ type: Array }) filterData: Array<{ [key: string]: unknown }> = [];
   /** mf or zm */
   @property({ type: String }) game = GAMES[0].value;
   /** U, E, or J */
   @property({ type: String }) version = VERSIONS[0];
   /** ram, code, or data */
-  @property({ type: String }) map = MAP_RAM;
+  @property({ type: String }) map = MAPS[0].value;
   /** hide table while fetching data */
   @property({ type: Boolean }) fetchingData = false;
 
   /** Columns that should not be displayed */
-  private hiddenColumns: Set<string> = new Set<string>([KEY_TAGS, KEY_LABEL]);
+  private hiddenColumns: Set<string> = new Set<string>([KEY_TAGS, KEY_LABEL, KEY_NOTES]);
   private pageSize: number = 1000;
   private pageIndex: number = 0;
 
@@ -484,7 +488,7 @@ export class MapApp extends LitElement {
                 <button @click="${this.collapseAll}">Collapse All</button>
               </div>
             </div>
-            <ul id="search-options" class="checkbox-list">
+            <ul id="filter-options" class="checkbox-list">
               <li title="Include struct info when filtering">
                 <input type="checkbox" id="filter-structs">
                 <label for="filter-structs">Structs</label>
