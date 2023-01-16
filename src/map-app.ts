@@ -349,8 +349,6 @@ export class MapApp extends LitElement {
     if (this.filterData.length < this.allData.length) {
       this.filterData = this.allData;
       this.collapseAll();
-      // DEBUG
-      console.log("Filter reset");
     }
     this.clearFilter();
   }
@@ -413,26 +411,27 @@ export class MapApp extends LitElement {
   }
 
   private renderPageNav() {
+    let content;
     if (this.fetchingData) {
-      return '';
-    }
-    // row info
-    const numRows = this.filterData.length;
-    const firstRow = this.pageIndex * this.pageSize + 1;
-    const lastRow = Math.min(firstRow + this.pageSize - 1, numRows);
-    // page info
-    const numPages = Math.max(Math.ceil(numRows / this.pageSize), 1);
-    const pages = [...Array(numPages).keys()];
-    const rowText = numRows > 0 ?
-      `${firstRow}-${lastRow} of ${numRows}` : 'No results';
-    return html`
-      <div id="page-nav">
+      content = 'Loading...';
+    } else {
+      // row info
+      const numRows = this.filterData.length;
+      const firstRow = this.pageIndex * this.pageSize + 1;
+      const lastRow = Math.min(firstRow + this.pageSize - 1, numRows);
+      // page info
+      const numPages = Math.max(Math.ceil(numRows / this.pageSize), 1);
+      const pages = [...Array(numPages).keys()];
+      const rowText = numRows > 0 ?
+        `${firstRow}-${lastRow} of ${numRows}` : 'No results';
+      content = html`
         <span id="num-rows">${rowText}</span>
         <span id="page-text">Page:</span>
         ${pages.map(p => html`
           <span class="${p === this.pageIndex ? 'curr-page' : 'page-num'}"
-            @click="${this.pageNumClicked}">${p + 1}</span>`)}
-      </div>`;
+            @click="${this.pageNumClicked}">${p + 1}</span>`)}`;
+    }
+    return html`<div id="page-nav">${content}</div>`;
   }
 
   private getTableType(): TableType {
