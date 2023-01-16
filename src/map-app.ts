@@ -1,7 +1,8 @@
 import { css, customElement, html, LitElement, property } from 'lit-element';
 import { TableType } from "./map-table";
 import { GameStructList, GameEnumList, GameStruct } from './entry-types';
-import { getHideableColumns } from './headings'
+import { getHideableColumns, KEY_LABEL, KEY_TAGS, KEY_TYPE, KEY_ENUM, KEY_DESC } from './headings'
+import { FilterItem, FilterParser, SearchType } from './filter-parser';
 
 const VERSIONS = ['U', 'E', 'J'];
 
@@ -70,25 +71,30 @@ export class MapApp extends LitElement {
     }
 
     li {
-      margin: 5px 0;
+      margin: 3px 0;
     }
 
     .search-box {
       position: relative;
       display: inline-block;
       box-sizing: border-box;
-      width: 170px;
-      /* 170 - 115 left position below */
-      padding-right: 55px;
+      width: 150px;
     }
 
-    .curr-page {
-      margin-right: 8px;
+    .checkbox-list {
+      text-align: left;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .curr-page,
+    .page-num {
+      margin: 0px 4px;
     }
     .page-num {
       cursor: pointer;
       color: #A0A0E0;
-      margin-right: 8px;
     }
     .page-num:hover {
       text-decoration: underline;
@@ -114,24 +120,27 @@ export class MapApp extends LitElement {
       column-gap: 15px;
     }
     #selectors {
-      grid-column: 1;
+      grid-column: 1 / 3;
       grid-row: 1;
     }
-    #search {
+    #filter {
       grid-column: 1;
       grid-row: 2;
     }
+    #filter-search {
+      margin-bottom: 5px;
+    }
+    #search-options {
+      grid-column: 2;
+      grid-row: 2;
+    }
     #page-nav {
-      grid-column: 1;
+      grid-column: 1 / 3;
       grid-row: 3;
     }
     #column-vis {
-      grid-column: 2;
+      grid-column: 4;
       grid-row: 1 / 5;
-      text-align: left;
-      list-style: none;
-      margin: 0;
-      padding: 0;
     }
 
     #page-nav {
@@ -143,41 +152,28 @@ export class MapApp extends LitElement {
     #page-text {
       margin-left: 10px;
     }
-
-    #main-table {
-      table-layout: fixed;
-      margin: auto;
-      max-width: 95%;
-    }
   `;
 
-  /** ? */
+  /** game struct definitions */
   @property({ type: Object }) structs: GameStructList = {};
-  /** ? */
+  /** game enum definitions */
   @property({ type: Object }) enums: GameEnumList = {};
-  /** ? */
-  @property({ type: Array }) data: Array<{ [key: string]: unknown }> = [];
-  /** ? */
-  @property({ type: Number }) resultIndex = 0;
-  /** ? */
-  @property({ type: Number }) resultCount = 0;
-  /** ? */
+  /** game data to display */
+  @property({ type: Array }) allData: Array<{ [key: string]: unknown }> = [];
+  @property({ type: Array }) filterData: Array<{ [key: string]: unknown }> = [];
+  /** mf or zm */
   @property({ type: String }) game = GAMES[0].value;
-  /** ? */
+  /** U, E, or J */
   @property({ type: String }) version = VERSIONS[0];
-  /** ? */
+  /** ram, code, or data */
   @property({ type: String }) map = MAP_RAM;
-  /** ? */
+  /** hide table while fetching data */
   @property({ type: Boolean }) fetchingData = false;
 
+  /** Columns that should not be displayed */
+  private hiddenColumns: Set<string> = new Set<string>([KEY_TAGS, KEY_LABEL]);
   private pageSize: number = 1000;
-  private pageIndex: number = -1;
-
-
-  query = '';
-  generator: Generator<{ row: number[], key: string }, void, unknown> | undefined =
-    undefined;
-  seenResults: Array<{ row: number[], key: string }> = [];
+  private pageIndex: number = 0;
 
   constructor() {
     super();
@@ -185,7 +181,7 @@ export class MapApp extends LitElement {
     this.fetchData();
     document.body.addEventListener('keyup', (e: Event) => {
       if ((e as KeyboardEvent).key == 'Escape') {
-        this.clearPrevHighlight();
+        this.resetFilter();
       }
     })
   }
@@ -256,96 +252,123 @@ export class MapApp extends LitElement {
       .then(response => response.json());
     // filter data by region
     fullData.forEach(entry => this.getVersionEntry(entry));
-    this.data = fullData.filter(entry => entry.addr !== null);
-    
+    this.allData = fullData.filter(entry => entry.addr !== null);
+
+    this.filterData = this.allData;
     this.pageIndex = 0;
+    this.clearFilter();
+
     this.fetchingData = false;
   }
 
   private inputHandler(e: Event) {
     let ke = (e as KeyboardEvent);
     if (ke.key == 'Enter') {
-      this.performSearch(
-        this.shadowRoot?.querySelector('input')!.value || '', !ke.shiftKey);
+      this.applyFilter();
     }
   }
 
-  private findHandler() {
-    this.performSearch(this.shadowRoot?.querySelector('input')!.value || '');
+  private checkFiltersOnDesc(desc: string, items: Array<FilterItem>): boolean {
+    // get description and its terms for searching
+    const descLower = desc.toLowerCase();
+    const descTerms = descLower.split(' ');
+    // check each item in filter
+    for (const item of items) {
+      if (item.type === SearchType.Term) {
+        if (descTerms.includes(item.text) === item.exclude) {
+          return false;
+        }
+      } else if (item.type === SearchType.Quote) {
+        if (descLower.includes(item.text) === item.exclude) {
+          return false;
+        }
+      } else if (item.type === SearchType.Regex) {
+        if (item.regex!.test(desc) === item.exclude) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
-  private clearPrevSearch() {
-    this.query = '';
-    this.generator = undefined;
-    this.resultIndex = 0;
-    this.resultCount = 0;
-    this.seenResults = [];
-    this.shadowRoot!.querySelector('input')!.value = '';
-    this.clearPrevHighlight();
+  private applyFilter() {
+    const box = this.shadowRoot?.querySelector('input.search-box') as HTMLInputElement;
+    const text = box.value;
+    if (text === '') {
+      this.resetFilter();
+      return;
+    }
+
+    // parse to get filter items
+    const items = FilterParser.parse(text);
+    const checkStruct = this.filterStructs();
+    const checkEnum = this.filterEnums();
+
+    this.pageIndex = 0;
+    this.filterData = this.allData.filter(entry => {
+      // check entry's description
+      const desc = entry[KEY_DESC] as string;
+      if (this.checkFiltersOnDesc(desc, items)) {
+        return true;
+      }
+      // check if entry is struct
+      if (checkStruct && KEY_TYPE in entry) {
+        const name = entry[KEY_TYPE] as string;
+        if (name in this.structs) {
+          const es = this.structs[name];
+          if (es.vars.some(rv => this.checkFiltersOnDesc(rv.desc, items))) {
+            return true;
+          }
+        }
+      }
+      // check if entry has enum
+      if (checkEnum && KEY_ENUM in entry) {
+        const name = entry[KEY_ENUM] as string;
+        if (name in this.enums) {
+          const ee = this.enums[name];
+          if (ee.some(ev => this.checkFiltersOnDesc(ev.desc, items))) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+    this.collapseAll();
   }
 
-  private clearPrevHighlight() {
-    //this.shadowRoot!.querySelector('map-table')!.clearHighlights();
+  private clearFilter() {
+    const box = this.shadowRoot?.querySelector('input.search-box') as HTMLInputElement;
+    box.value = '';
+  }
+
+  private resetFilter() {
+    if (this.filterData.length < this.allData.length) {
+      this.filterData = this.allData;
+      this.collapseAll();
+      // DEBUG
+      console.log("Filter reset");
+    }
+    this.clearFilter();
   }
 
   private collapseAll() {
     this.shadowRoot?.querySelector('map-table')!.collapseAll();
   }
 
-  private async performSearch(query: string, forward = true) {
-    if (!query) {
-      return;
-    }
-
-    this.clearPrevHighlight();
-    if (query != this.query) {
-      this.query = query;
-      this.resultIndex = 0;
-      //this.generator = this.search(query, this.data, []);
-      this.seenResults = [];
-    }
-    if (!forward && this.seenResults.length && this.resultIndex > 0) {
-      // go backwards to previous result
-      this.resultIndex = this.resultIndex - 1;
-      //let result = this.seenResults[this.resultIndex - 1];
-      //this.shadowRoot?.querySelector('map-table')!.highlight(result);
-      await Promise.resolve();
-      return;
-    }
-    if (this.resultIndex < this.seenResults.length) {
-      // go forwards through already generated results
-      this.resultIndex++;
-      //let result = this.seenResults[this.resultIndex - 1];
-      //this.shadowRoot?.querySelector('map-table')!.highlight(result);
-      await Promise.resolve();
-      return;
-    }
-    const result = this.generator!.next().value;
-    if (!result) {
-      this.query = '';
-      this.generator = undefined;
-      this.resultIndex = 0;
-      this.resultCount = 0;
-      return;
-    }
-    // deep copy of object with array
-    let storage = Object.assign({}, result);
-    storage.row = storage.row.slice();
-    this.seenResults.push(storage);
-    this.resultIndex = this.resultIndex + 1;
-    // highlight that result
-    //this.shadowRoot?.querySelector('map-table')!.highlight(result);
+  private filterStructs(): boolean {
+    const cb = this.shadowRoot?.querySelector('#filter-structs') as HTMLInputElement;
+    return cb.checked;
   }
 
-  private getRenderedResultsCount(resultIndex: number, resultCount: number) {
-    return resultIndex ? resultIndex + ' of ' + resultCount : ''
+  private filterEnums(): boolean {
+    const cb = this.shadowRoot?.querySelector('#filter-enums') as HTMLInputElement;
+    return cb.checked;
   }
 
   private gameChangeHandler() {
     this.game =
       (this.shadowRoot!.querySelector('#game-select')! as HTMLInputElement)
         .value;
-    this.clearPrevSearch();
     this.fetchData();
   }
 
@@ -353,7 +376,6 @@ export class MapApp extends LitElement {
     this.version =
       (this.shadowRoot!.querySelector('#version-select')! as HTMLInputElement)
         .value;
-    this.clearPrevSearch();
     this.fetchData();
   }
 
@@ -361,15 +383,21 @@ export class MapApp extends LitElement {
     this.map =
       (this.shadowRoot!.querySelector('#map-select')! as HTMLInputElement)
         .value;
-    this.clearPrevSearch();
     this.fetchData();
   }
 
   private toggleColumn(event: any) {
     const colName = event.target.id;
     const visible = event.target.checked;
-    this.shadowRoot?.querySelector('map-table')!.toggleColumn(colName, visible);
-    this.render();
+    if (visible) {
+      this.hiddenColumns.delete(colName);
+    } else {
+      this.hiddenColumns.add(colName);
+    }
+
+    const table = this.shadowRoot?.querySelector('map-table')!;
+    table.updateVisibleColumns();
+    this.requestUpdate();
   }
 
   private pageNumClicked(event: any) {
@@ -381,16 +409,21 @@ export class MapApp extends LitElement {
   }
 
   private renderPageNav() {
+    if (this.fetchingData) {
+      return '';
+    }
     // row info
-    const numRows = this.data.length;
+    const numRows = this.filterData.length;
     const firstRow = this.pageIndex * this.pageSize + 1;
     const lastRow = Math.min(firstRow + this.pageSize - 1, numRows);
     // page info
-    const numPages = Math.ceil(numRows / this.pageSize);
+    const numPages = Math.max(Math.ceil(numRows / this.pageSize), 1);
     const pages = [...Array(numPages).keys()];
+    const rowText = numRows > 0 ?
+      `${firstRow}-${lastRow} of ${numRows}` : 'No results';
     return html`
       <div id="page-nav">
-        <span id="num-rows">${firstRow}-${lastRow} of ${numRows}</span>
+        <span id="num-rows">${rowText}</span>
         <span id="page-text">Page:</span>
         ${pages.map(p => html`
           <span class="${p === this.pageIndex ? 'curr-page' : 'page-num'}"
@@ -411,14 +444,15 @@ export class MapApp extends LitElement {
     if (this.fetchingData) {
       return '';
     }
-    const firstRow = this.pageIndex * this.pageSize + 1;
+    const firstRow = this.pageIndex * this.pageSize;
     const lastRow = firstRow + this.pageSize;
-    return html`<map-table id="main-table"
+    return html`<map-table
       .tableType="${this.getTableType()}"
       .version="${this.version}"
-      .data="${this.data.slice(firstRow, lastRow)}"
+      .data="${this.filterData.slice(firstRow, lastRow)}"
       .structs="${this.structs}"
-      .enums="${this.enums}">
+      .enums="${this.enums}"
+      .hiddenColumns="${this.hiddenColumns}">
     </map-table>`;
   }
 
@@ -439,21 +473,33 @@ export class MapApp extends LitElement {
                 ${VERSIONS.map(ver => html`<option value="${ver}" ?selected="${this.version == ver}">${ver}</option>`)}
               </select>
             </div>
-            <div id="search">
-              Search:
-              <label class="search-box" data-results="${this.getRenderedResultsCount(
-                this.resultIndex, this.resultCount)}">
+            <div id="filter">
+              <div id="filter-search">
+                Filter:
                 <input class="search-box" @keyup='${this.inputHandler}'/>
-              </label>
-              <button @click="${this.findHandler}">Find</button>
-              <button @click="${this.clearPrevSearch}">Reset</button>
-              <button @click="${this.collapseAll}">Collapse All</button>
+              </div>
+              <div>
+                <button @click="${this.applyFilter}">Apply</button>
+                <button @click="${this.resetFilter}">Reset</button>
+                <button @click="${this.collapseAll}">Collapse All</button>
+              </div>
             </div>
+            <ul id="search-options" class="checkbox-list">
+              <li title="Include struct info when filtering">
+                <input type="checkbox" id="filter-structs">
+                <label for="filter-structs">Structs</label>
+              </li>
+              <li title="Include enum info when filtering">
+                <input type="checkbox" id="filter-enums">
+                <label for="filter-enums">Enums</label>
+              </li>
+            </ul>
             ${this.renderPageNav()}
-            <ul id="column-vis">
+            <ul id="column-vis" class="checkbox-list">
               ${getHideableColumns(this.map).map(
                 col => html`<li>
-                  <input type="checkbox" id="${col.key}" checked
+                  <input type="checkbox" id="${col.key}"
+                    .checked=${!this.hiddenColumns.has(col.key)}
                     @change="${this.toggleColumn}">
                   <label for="${col.key}">${col.head}</label>
               </li>`)}

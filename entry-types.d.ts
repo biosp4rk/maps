@@ -1,5 +1,6 @@
 export { GameVar, GameRelVar, GameAbsVar, GameCode, GameStruct, GameEnumVal, GameStructList, GameEnumList };
 declare class GameVar {
+    desc: string;
     label: string;
     type: string;
     tags?: string[];
@@ -26,6 +27,7 @@ declare class GameAbsVar extends GameVar {
     getAddr(): number;
 }
 declare class GameCode {
+    desc: string;
     label: string;
     addr: string;
     size: string;
@@ -41,6 +43,7 @@ declare class GameCode {
     getReturn(): string;
 }
 declare class GameEnumVal {
+    desc: string;
     label: string;
     val: string;
     notes?: string;

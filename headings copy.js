@@ -2,7 +2,6 @@ export const KEY_ADDR = 'addr';
 export const KEY_LEN = 'length';
 export const KEY_TAGS = 'tags';
 export const KEY_TYPE = 'type';
-export const KEY_ENUM = 'enum';
 export const KEY_LABEL = 'label';
 export const KEY_DESC = 'desc';
 export const KEY_ARGS = 'params';
@@ -89,4 +88,4 @@ export function getHideableColumns(map) {
     }
     return [];
 }
-//# sourceMappingURL=headings.js.map
+//# sourceMappingURL=headings%20copy.js.map

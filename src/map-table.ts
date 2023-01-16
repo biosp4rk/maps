@@ -5,8 +5,8 @@ import {
 } from './entry-types';
 import { toHex } from './utils';
 import {
-  KEY_ADDR, KEY_LEN, KEY_TYPE, KEY_TAGS, KEY_LABEL,
-  KEY_ARGS, KEY_RET, KEY_OFF, KEY_VAL, KEY_NOTES, getHeading, 
+  KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_DESC,
+  KEY_ARGS, KEY_RET, KEY_OFF, KEY_VAL, KEY_NOTES, getHeading
 } from './headings';
 
 export enum TableType {
@@ -17,6 +17,21 @@ export enum TableType {
   StructDef,
   EnumDef
 }
+
+// TODO: move?
+const CATEGORIES: { [key: string]: string } = {
+  'flags': 'Flags',
+  'ascii': 'ASCII',
+  'text': 'Text',
+  'rle': 'RLE',
+  'lz': 'LZ',
+  'gfx': 'Graphics',
+  'tilemap': 'Tilemap',
+  'palette': 'Palette',
+  'oamframe': 'OAM frame',
+  'thumb': 'THUMB',
+  'arm': 'ARM',
+};
 
 /** Renders a table */
 @customElement('map-table')
@@ -33,6 +48,10 @@ export class MapTable extends LitElement {
 
     th, td {
       padding: 3px 5px;
+    }
+
+    td {
+      vertical-align: top;
     }
 
     th {
@@ -59,6 +78,7 @@ export class MapTable extends LitElement {
     .type {
       text-align: right;
       max-width: 300px;
+      padding-top: 5px;
     }
 
     .type, .inline-type {
@@ -66,8 +86,17 @@ export class MapTable extends LitElement {
       font-size: 90%;
     }
 
-    .label-span {
-      max-width: 400px;
+    .inline-type {
+      margin-right: 3px;
+    }
+
+    .label {
+      max-width: 300px;
+      word-wrap: break-word;
+    }
+
+    .desc-span {
+      max-width: 350px;
       display: inline-block;
       word-wrap: break-word;
     }
@@ -75,7 +104,7 @@ export class MapTable extends LitElement {
       max-width: 250px;
     }
     .notes {
-      max-width: 300px;
+      max-width: 350px;
     }
 
     .has-tooltip {
@@ -87,8 +116,14 @@ export class MapTable extends LitElement {
       cursor: pointer;
     }
 
-    #table {
+    .main-table {
+      table-layout: fixed;
       margin: auto;
+      max-width: 95%;
+    }
+
+    .sub-table {
+      margin: 5px 0px 2px 0px;
     }
 
     :host(#first) #heading-row {
@@ -108,38 +143,39 @@ export class MapTable extends LitElement {
   @property({ type: String, reflect: true }) version = '';
   /** Address of parent entry if table is part of row */
   @property({ type: Number }) parentAddr = NaN;
-  
   /** Columns that should not be displayed */
-  private hiddenColumns: Set<string> = new Set<string>();
-  /** Indexes of rows that are expanded */
-  private expandedRows: Set<number> = new Set<number>();
-  
+  @property({ type: Set }) hiddenColumns: Set<string> = new Set<string>();
 
-  toggleColumn(colName: string, visible: boolean) {
-    if (visible) {
-      this.hiddenColumns.delete(colName);
-    } else {
-      this.hiddenColumns.add(colName);
-    }
+  /** Indexes of rows that are expanded */
+  private expandedRows: Set<number> = new Set<number>();  
+
+  collapseAll() {
+    const tables = Array.from(this.shadowRoot?.querySelectorAll('map-table')!);
+    tables.forEach(table => table.collapseAll());
+    this.expandedRows.clear();
     this.requestUpdate();
   }
 
-  collapseAll() {
-    // let rows = Array.from(this.shadowRoot?.querySelectorAll('map-row')!);
-    // rows.forEach(row => row.collapseAll());
+  updateVisibleColumns() {
+    // recursively update sub-tables
+    const tables = this.shadowRoot?.querySelectorAll('map-table')!
+    for (const table of tables) {
+      table.updateVisibleColumns();
+    }
+    this.requestUpdate();
   }
 
   private getClasses(): string[] {
     switch (this.tableType) {
       case TableType.RamList:
       case TableType.DataList:
-        return [KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_NOTES];
+        return [KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.CodeList:
-        return [KEY_ADDR, KEY_LEN, KEY_LABEL, KEY_ARGS, KEY_RET, KEY_NOTES];
+        return [KEY_ADDR, KEY_LEN, KEY_LABEL, KEY_DESC, KEY_ARGS, KEY_RET, KEY_NOTES];
       case TableType.StructDef:
-        return [KEY_OFF, KEY_LEN, KEY_TYPE, KEY_LABEL, KEY_NOTES];
+        return [KEY_OFF, KEY_LEN, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.EnumDef:
-        return [KEY_VAL, KEY_LABEL, KEY_NOTES];
+        return [KEY_VAL, KEY_LABEL, KEY_DESC, KEY_NOTES];
       default:
         throw new Error('Invalid TableType ' + this.tableType);
     }
@@ -150,6 +186,12 @@ export class MapTable extends LitElement {
     return this.getClasses()
       .filter(k => !this.hiddenColumns.has(k))
       .map(k => getHeading(k));
+  }
+
+  private isMainTable(): boolean {
+    return this.tableType === TableType.RamList ||
+      this.tableType === TableType.CodeList ||
+      this.tableType === TableType.DataList;
   }
 
   private expand(event: any) {
@@ -173,7 +215,8 @@ export class MapTable extends LitElement {
     if (this.hiddenColumns.has(KEY_TAGS)) {
       return '';
     }
-    return html`<td class="tags">${tags ? tags.join(', ') : ''}</td>`
+    const cats = tags?.map(t => CATEGORIES[t]);
+    return html`<td class="tags">${cats ? cats.join(', ') : ''}</td>`
   }
 
   private renderVarLength(entry: GameVar) {
@@ -187,7 +230,7 @@ export class MapTable extends LitElement {
       title="${toolTip}">${len}</td>`;
   }
 
-  private renderSubTable(entry: GameAbsVar, index: number) {
+  private renderSubTable(entry: GameVar, index: number) {
     const isEnum = Boolean(entry.enum) && entry.enum! in this.enums;
     const isStruct = entry.spec() in this.structs;
     if (!(isEnum || isStruct)) {
@@ -195,7 +238,7 @@ export class MapTable extends LitElement {
     }
     const expanded = this.expandedRows.has(index);
     const toggle = html`<span class="expand" data-idx="${index}"
-      @click="${this.expand}">[${expanded ? '-' : '+'}]</span>`;
+      @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`;
     if (!expanded) {
       return toggle;
     }
@@ -205,9 +248,18 @@ export class MapTable extends LitElement {
       table = this.renderEnumEntry(vals);
     } else if (entry.spec() in this.structs) {
       const gs = this.structs[entry.spec()];
-      table = this.renderStructEntry(gs, entry.getAddr());
+      const pa = this.parentAddr ?
+        this.parentAddr : (entry as GameAbsVar).getAddr();
+      table = this.renderStructEntry(gs, pa);
     }
     return html`${toggle}${table}`;
+  }
+
+  private renderLabel(label: string) {
+    if (this.hiddenColumns.has(KEY_LABEL)) {
+      return '';
+    }
+    return html`<td class="label">${label}</td>`
   }
 
   private renderNotes(notes?: string) {
@@ -223,8 +275,9 @@ export class MapTable extends LitElement {
       ${this.renderVarLength(entry)}
       ${this.renderTags(entry.tags)}
       ${this.renderType(entry.type)}
-      <td class="label">
-        <span class="label-span">${entry.label}</span>
+      ${this.renderLabel(entry.label)}
+      <td class="desc">
+        <span class="desc-span">${entry.desc}</span>
         ${this.renderSubTable(entry, index)}
       </td>
       ${this.renderNotes(entry.notes)}
@@ -251,7 +304,7 @@ export class MapTable extends LitElement {
     }
     return html`<td class="params">${args.map(arg => html`<div>
       <span class="inline-type">${arg.type}</span>
-      <span>${arg.label}</span></div>`)}
+      <span>${arg.desc}</span></div>`)}
     </td>`;
   }
 
@@ -264,7 +317,7 @@ export class MapTable extends LitElement {
     }
     return html`<td class="returns">
       <span class="inline-type">${ret.type}</span>
-      <span>${ret.label}</span>
+      <span>${ret.desc}</span>
     </td>`;
   }
 
@@ -272,8 +325,9 @@ export class MapTable extends LitElement {
     return html`<tr>
       <td class="addr">${entry.addr}</td>
       ${this.renderCodeLength(entry)}
-      <td class="label">
-        <span class="label-span">${entry.label}</span>
+      ${this.renderLabel(entry.label)}
+      <td class="desc">
+        <span class="desc-span">${entry.desc}</span>
       </td>
       ${this.renderCodeArgs(entry.params)}
       ${this.renderCodeRet(entry.return)}
@@ -281,14 +335,15 @@ export class MapTable extends LitElement {
     </tr>`;
   }
 
-  private renderStructVar(entry: GameRelVar) {
-    // TODO: allow enum or struct table in label
+  private renderStructVar(entry: GameRelVar, index: number) {
     return html`<tr>
       <td class="offset">${entry.offset}</td>
       ${this.renderVarLength(entry)}
       ${this.renderType(entry.type)}
-      <td class="label">
-        <span class="label-span">${entry.label}</span>
+      ${this.renderLabel(entry.label)}
+      <td class="desc">
+        <span class="desc-span">${entry.desc}</span>
+        ${this.renderSubTable(entry, index)}
       </td>
       ${this.renderNotes(entry.notes)}
     </tr>`;
@@ -300,14 +355,16 @@ export class MapTable extends LitElement {
       .data="${entry.vars}"
       .structs="${this.structs}"
       .enums="${this.enums}"
-      .parentAddr="${parentAddr}">
+      .parentAddr="${parentAddr}"
+      .hiddenColumns="${this.hiddenColumns}">
     </map-table>`
   }
 
   private renderEnumVal(entry: GameEnumVal) {
     return html`<tr>
       <td class="val">${entry.val}</td>
-      <td class="label">${entry.label}</td>
+      ${this.renderLabel(entry.label)}
+      <td class="desc">${entry.desc}</td>
       ${this.renderNotes(entry.notes)}
     </tr>`;
   }
@@ -317,7 +374,8 @@ export class MapTable extends LitElement {
       .tableType="${TableType.EnumDef}"
       .data="${entry}"
       .structs="${this.structs}"
-      .enums="${this.enums}">
+      .enums="${this.enums}"
+      .hiddenColumns="${this.hiddenColumns}">
     </map-table>`
   }
 
@@ -335,7 +393,7 @@ export class MapTable extends LitElement {
       case TableType.StructDef:
         const tgrv = Object.create(GameRelVar.prototype);
         const grv = Object.assign(tgrv, item);
-        return this.renderStructVar(grv);
+        return this.renderStructVar(grv, index);
       case TableType.EnumDef:
         const tge = Object.create(GameEnumVal.prototype);
         const ge = Object.assign(tge, item);
@@ -347,7 +405,7 @@ export class MapTable extends LitElement {
 
   override render() {
     return html`
-      <table id="table">
+      <table class="${this.isMainTable() ? 'main-table' : 'sub-table'}">
         <tr id="heading-row">
           ${this.getHeadings().map(heading => html`
             <th>${heading}</th>`)}

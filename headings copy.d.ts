@@ -2,7 +2,6 @@ export declare const KEY_ADDR = "addr";
 export declare const KEY_LEN = "length";
 export declare const KEY_TAGS = "tags";
 export declare const KEY_TYPE = "type";
-export declare const KEY_ENUM = "enum";
 export declare const KEY_LABEL = "label";
 export declare const KEY_DESC = "desc";
 export declare const KEY_ARGS = "params";
@@ -16,4 +15,4 @@ export declare function getHideableColumns(map: string): {
     head: string;
     key: string;
 }[];
-//# sourceMappingURL=headings.d.ts.map
+//# sourceMappingURL=headings%20copy.d.ts.map

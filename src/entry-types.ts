@@ -6,6 +6,7 @@ import { toHex, getPrimSize } from "./utils";
 
 
 class GameVar {
+  desc!: string;
   label!: string;
   type!: string;
   tags?: string[];
@@ -111,6 +112,7 @@ class GameAbsVar extends GameVar {
 }
 
 class GameCode {
+  desc!: string;
   label!: string;
   addr!: string;
   size!: string;
@@ -143,6 +145,7 @@ class GameCode {
 }
 
 class GameEnumVal {
+  desc!: string;
   label!: string;
   val!: string;
   notes?: string;
