@@ -6,7 +6,11 @@ import {
 } from './headings'
 import { FilterItem, FilterParser, SearchType } from './filter-parser';
 
-const VERSIONS = ['U', 'E', 'J'];
+const URL_GAME = 'game';
+const URL_MAP = 'map';
+const URL_REGION = 'region';
+
+const REGIONS = ['U', 'E', 'J'];
 
 const GAMES = [
   {
@@ -168,7 +172,7 @@ export class MapApp extends LitElement {
   /** mf or zm */
   @property({ type: String }) game = GAMES[0].value;
   /** U, E, or J */
-  @property({ type: String }) version = VERSIONS[0];
+  @property({ type: String }) region = REGIONS[0];
   /** ram, code, or data */
   @property({ type: String }) map = MAPS[0].value;
   /** hide table while fetching data */
@@ -181,7 +185,7 @@ export class MapApp extends LitElement {
 
   constructor() {
     super();
-    this.parseUrlSearchParams();
+    this.parseUrlParams();
     this.fetchData();
     document.body.addEventListener('keyup', (e: Event) => {
       if ((e as KeyboardEvent).key == 'Escape') {
@@ -190,28 +194,37 @@ export class MapApp extends LitElement {
     })
   }
 
-  private parseUrlSearchParams() {
-    // check for game, version, and map in search params
+  private parseUrlParams() {
+    // check for game, region, and map in search params
     const params = new URLSearchParams(window.location.search);
-    const game = params.get('game') || '';
+    const game = params.get(URL_GAME) || '';
     if (GAMES.some(x => x.value === game)) {
       this.game = game;
     }
-    const version = params.get('version')?.toUpperCase() || '';
-    if (VERSIONS.includes(version)) {
-      this.version = version;
+    const region = params.get(URL_REGION)?.toUpperCase() || '';
+    if (REGIONS.includes(region)) {
+      this.region = region;
     }
-    const map = params.get('map') || '';
+    const map = params.get(URL_MAP) || '';
     if (MAPS.some(x => x.value === map)) {
       this.map = map;
     }
   }
 
-  private getVersionEntry(entry: { [key: string]: unknown }) {
+  private setUrlParams() {
+    const params = new URLSearchParams();
+    params.set(URL_GAME, this.game);
+    params.set(URL_REGION, this.region);
+    params.set(URL_MAP, this.map);
+    const url = window.location.pathname + '?' + params.toString();
+    window.history.replaceState(null, '', url);
+  }
+
+  private getRegionEntry(entry: { [key: string]: unknown }) {
     if (typeof entry.addr == 'object') {
       const addrs = entry.addr as { [key: string]: string };
-      if (this.version in addrs) {
-        entry.addr = addrs[this.version]
+      if (this.region in addrs) {
+        entry.addr = addrs[this.region]
       } else {
         entry.addr = null;
       }
@@ -219,8 +232,8 @@ export class MapApp extends LitElement {
     // functions may have different sizes
     if (typeof entry.size == 'object') {
       const sizes = entry.size as { [key: string]: string };
-      if (this.version in sizes) {
-        entry.size = sizes[this.version]
+      if (this.region in sizes) {
+        entry.size = sizes[this.region]
       } else {
         entry.addr = null;
       }
@@ -228,7 +241,7 @@ export class MapApp extends LitElement {
   }
 
   async fetchData() {
-    if (!this.game || !this.version || !this.map) {
+    if (!this.game || !this.region || !this.map) {
       return;
     }
     // read data from json files
@@ -255,12 +268,13 @@ export class MapApp extends LitElement {
     let fullData: Array<{ [key: string]: unknown }> = await fetch(targetBaseUrl + `${this.map}.json`)
       .then(response => response.json());
     // filter data by region
-    fullData.forEach(entry => this.getVersionEntry(entry));
+    fullData.forEach(entry => this.getRegionEntry(entry));
     this.allData = fullData.filter(entry => entry.addr !== null);
 
     this.filterData = this.allData;
     this.pageIndex = 0;
     this.clearFilter();
+    this.setUrlParams();
 
     this.fetchingData = false;
   }
@@ -374,9 +388,9 @@ export class MapApp extends LitElement {
     this.fetchData();
   }
 
-  private versionChangeHandler() {
-    this.version =
-      (this.shadowRoot!.querySelector('#version-select')! as HTMLInputElement)
+  private regionChangeHandler() {
+    this.region =
+      (this.shadowRoot!.querySelector('#region-select')! as HTMLInputElement)
         .value;
     this.fetchData();
   }
@@ -451,7 +465,6 @@ export class MapApp extends LitElement {
     const lastRow = firstRow + this.pageSize;
     return html`<map-table
       .tableType="${this.getTableType()}"
-      .version="${this.version}"
       .data="${this.filterData.slice(firstRow, lastRow)}"
       .structs="${this.structs}"
       .enums="${this.enums}"
@@ -472,8 +485,8 @@ export class MapApp extends LitElement {
               <select id="map-select" @change="${this.mapChangeHandler}">
                   ${MAPS.map(map => html`<option value="${map.value}" ?selected="${this.map == map.value}">${map.label}</option>`)}
               </select>
-              <select id="version-select" @change="${this.versionChangeHandler}">
-                ${VERSIONS.map(ver => html`<option value="${ver}" ?selected="${this.version == ver}">${ver}</option>`)}
+              <select id="region-select" @change="${this.regionChangeHandler}">
+                ${REGIONS.map(reg => html`<option value="${reg}" ?selected="${this.region == reg}">${reg}</option>`)}
               </select>
             </div>
             <div id="filter">
