@@ -34,6 +34,19 @@ const HEADINGS = {
     [KEY_OFF]: HEAD_OFF,
     [KEY_VAL]: HEAD_VAL
 };
+export const CATEGORIES = {
+    'flags': 'Flags',
+    'ascii': 'ASCII',
+    'text': 'Text',
+    'rle': 'RLE',
+    'lz': 'LZ',
+    'gfx': 'Graphics',
+    'tilemap': 'Tilemap',
+    'palette': 'Palette',
+    'oamframe': 'OAM frame',
+    'thumb': 'THUMB',
+    'arm': 'ARM',
+};
 export const SEARCHABLE_KEYS = [KEY_DESC, KEY_ADDR, KEY_ARGS, KEY_RET];
 export function getHeading(key) {
     return HEADINGS[key];

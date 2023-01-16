@@ -10,6 +10,9 @@ export declare const KEY_RET = "returns";
 export declare const KEY_OFF = "offset";
 export declare const KEY_VAL = "value";
 export declare const KEY_NOTES = "notes";
+export declare const CATEGORIES: {
+    [key: string]: string;
+};
 export declare const SEARCHABLE_KEYS: string[];
 export declare function getHeading(key: string): string;
 export declare function getHideableColumns(map: string): {
