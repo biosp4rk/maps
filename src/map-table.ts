@@ -125,8 +125,8 @@ export class MapTable extends LitElement {
   @property({ type: Object }) structs: GameStructList = {};
   /** All enum definitions in the game */
   @property({ type: Object }) enums: GameEnumList = {};
-  /** Selected game version (U, E, or J) */
-  @property({ type: String, reflect: true }) version = '';
+  /** Selected game region (U, E, or J) */
+  //@property({ type: String, reflect: true }) region = '';
   /** Address of parent entry if table is part of row */
   @property({ type: Number }) parentAddr = NaN;
   /** Columns that should not be displayed */
