@@ -45,7 +45,7 @@
   "author": "biospark",
   "license": "BSD-3-Clause",
   "dependencies": {
-    "lit": "^2.2.0"
+    "lit": "^2.6.1"
   },
   "devDependencies": {
     "@11ty/eleventy": "^0.12.1",
