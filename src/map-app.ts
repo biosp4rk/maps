@@ -214,7 +214,7 @@ export class MapApp extends LitElement {
   private setUrlParams() {
     const params = new URLSearchParams();
     params.set(URL_GAME, this.game);
-    params.set(URL_REGION, this.region);
+    params.set(URL_REGION, this.region.toLowerCase());
     params.set(URL_MAP, this.map);
     const url = window.location.pathname + '?' + params.toString();
     window.history.replaceState(null, '', url);
