@@ -18,6 +18,8 @@ export enum TableType {
   EnumDef
 }
 
+const grayBorder = css`1px solid #808080`;
+
 /** Renders a table */
 @customElement('map-table')
 export class MapTable extends LitElement {
@@ -27,7 +29,7 @@ export class MapTable extends LitElement {
     }
 
     table, th, td {
-      border: 1px solid #808080;
+      border: ${grayBorder};
       border-collapse: collapse;
     }
 
@@ -85,15 +87,26 @@ export class MapTable extends LitElement {
       display: inline-block;
       word-wrap: break-word;
     }
+    
     .params, .returns {
       max-width: 250px;
     }
+
+    .code-var-notes {
+      font-size: 80%;
+      border: ${grayBorder};
+      padding: 3px 5px;
+      margin: 5px 0px 2px 0px;
+    }
+
     .notes {
       max-width: 350px;
     }
 
     .has-tooltip {
       cursor: help;
+      text-decoration: underline dotted;
+      text-decoration-thickness: from-font;
     }
 
     .expand {
@@ -125,20 +138,18 @@ export class MapTable extends LitElement {
   @property({ type: Object }) structs: GameStructList = {};
   /** All enum definitions in the game */
   @property({ type: Object }) enums: GameEnumList = {};
-  /** Selected game region (U, E, or J) */
-  //@property({ type: String, reflect: true }) region = '';
   /** Address of parent entry if table is part of row */
   @property({ type: Number }) parentAddr = NaN;
   /** Columns that should not be displayed */
   @property({ type: Set }) hiddenColumns: Set<string> = new Set<string>();
 
   /** Indexes of rows that are expanded */
-  private expandedRows: Set<number> = new Set<number>();  
+  private expandedItems: Set<string> = new Set<string>();
 
   collapseAll() {
     const tables = Array.from(this.shadowRoot?.querySelectorAll('map-table')!);
     tables.forEach(table => table.collapseAll());
-    this.expandedRows.clear();
+    this.expandedItems.clear();
     this.requestUpdate();
   }
 
@@ -181,11 +192,11 @@ export class MapTable extends LitElement {
   }
 
   private expand(event: any) {
-    const idx = parseInt(event.target.dataset.idx);
-    if (this.expandedRows.has(idx)) {
-      this.expandedRows.delete(idx);
+    const key: string = event.target.dataset.expandKey;
+    if (this.expandedItems.has(key)) {
+      this.expandedItems.delete(key);
     } else {
-      this.expandedRows.add(idx);
+      this.expandedItems.add(key);
     }
     this.requestUpdate();
   }
@@ -242,12 +253,13 @@ export class MapTable extends LitElement {
     return html`<td class="label">${label}</td>`
   }
 
-  private renderDesc(entry: GameVar, index: number) {
+  private renderDesc(entry: GameVar) {
     let toggle: any = '';
     let table: any = '';
     if (this.hasSubTable(entry)) {
-      const expanded = this.expandedRows.has(index);
-      toggle = html`<span class="expand" data-idx="${index}"
+      const key = entry.label;
+      const expanded = this.expandedItems.has(key);
+      toggle = html`<span class="expand" data-expand-key="${key}"
         @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`;
       if (expanded) {
         table = this.renderSubTable(entry);
@@ -266,14 +278,14 @@ export class MapTable extends LitElement {
     return html`<td class="notes">${notes}</td>`
   }
 
-  private renderAbsVarEntry(entry: GameAbsVar, index: number) {
+  private renderAbsVarEntry(entry: GameAbsVar) {
     return html`<tr>
       <td class="addr">${entry.addr}</td>
       ${this.renderVarLength(entry)}
       ${this.renderTags(entry.tags)}
       ${this.renderType(entry.type)}
       ${this.renderLabel(entry.label)}
-      ${this.renderDesc(entry, index)}
+      ${this.renderDesc(entry)}
       ${this.renderNotes(entry.notes)}
     </tr>`;
   }
@@ -284,35 +296,58 @@ export class MapTable extends LitElement {
     }
     const len = toHex(entry.getSize());
     const toolTip = entry.getToolTip();
-    return html`<td
-      class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
-      title="${toolTip}">${len}</td>`;
+    return html`<td>
+      <div class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
+        title="${toolTip}">${len}</div>
+    </td>`;
   }
 
-  private renderCodeArgs(args: GameVar[]) {
+  private renderCodeVarDesc(cv: GameVar, paramIdx: number, entryLabel: string) {
+    const notes = cv.notes ? cv.notes : '';
+    let toggle: any = '';
+    let noteBox: any = '';
+    if (notes) {
+      const key = `${entryLabel}:${paramIdx}`;
+      const expanded = this.expandedItems.has(key);
+      toggle = html`<span class="expand" data-expand-key="${key}"
+        @click="${this.expand}">[?]</span>`;
+      if (expanded) {
+        noteBox = html`<div class="code-var-notes">${notes}</div>`
+      }
+    }
+    return html`<span class="desc-span">${cv.desc}${toggle}</span>
+      ${noteBox}`;
+  }
+
+  private renderCodeVar(cv: GameVar, paramIdx: number, entryLabel: string) {
+    return html`<div>
+      <span class="inline-type">${cv.type}</span>
+      ${this.renderCodeVarDesc(cv, paramIdx, entryLabel)}
+    </div>`;
+  }
+
+  private renderCodeArgs(entry: GameCode) {
     if (this.hiddenColumns.has(KEY_ARGS)) {
       return '';
     }
+    const args = entry.params;
     if (args === null) {
       return html`<td>void</td>`;
     }
-    return html`<td class="params">${args.map(arg => html`<div>
-      <span class="inline-type">${arg.type}</span>
-      <span>${arg.desc}</span></div>`)}
+    return html`<td class="params">${args.map(
+      (arg, pIdx) => this.renderCodeVar(arg, pIdx, entry.label))}
     </td>`;
   }
 
-  private renderCodeRet(ret: GameVar) {
+  private renderCodeRet(entry: GameCode) {
     if (this.hiddenColumns.has(KEY_RET)) {
       return '';
     }
+    const ret = entry.return;
     if (ret === null) {
       return html`<td>void</td>`;
     }
-    return html`<td class="returns">
-      <span class="inline-type">${ret.type}</span>
-      <span>${ret.desc}</span>
-    </td>`;
+    return html`<td class="returns">${this.renderCodeVar(ret, -1, entry.label)}</td>`;
   }
 
   private renderCodeEntry(entry: GameCode) {
@@ -323,19 +358,19 @@ export class MapTable extends LitElement {
       <td class="desc">
         <span class="desc-span">${entry.desc}</span>
       </td>
-      ${this.renderCodeArgs(entry.params)}
-      ${this.renderCodeRet(entry.return)}
+      ${this.renderCodeArgs(entry)}
+      ${this.renderCodeRet(entry)}
       ${this.renderNotes(entry.notes)}
     </tr>`;
   }
 
-  private renderStructVar(entry: GameRelVar, index: number) {
+  private renderStructVar(entry: GameRelVar) {
     return html`<tr>
       <td class="offset">${entry.offset}</td>
       ${this.renderVarLength(entry)}
       ${this.renderType(entry.type)}
       ${this.renderLabel(entry.label)}
-      ${this.renderDesc(entry, index)}
+      ${this.renderDesc(entry)}
       ${this.renderNotes(entry.notes)}
     </tr>`;
   }
@@ -370,13 +405,13 @@ export class MapTable extends LitElement {
     </map-table>`
   }
 
-  private renderRow(item: unknown, index: number) {
+  private renderRow(item: unknown) {
     switch (this.tableType) {
       case TableType.RamList:
       case TableType.DataList:
         const tgav = Object.create(GameAbsVar.prototype);
         const gav = Object.assign(tgav, item);
-        return this.renderAbsVarEntry(gav, index);
+        return this.renderAbsVarEntry(gav);
       case TableType.CodeList:
         const tgc = Object.create(GameCode.prototype);
         const gc = Object.assign(tgc, item);
@@ -384,7 +419,7 @@ export class MapTable extends LitElement {
       case TableType.StructDef:
         const tgrv = Object.create(GameRelVar.prototype);
         const grv = Object.assign(tgrv, item);
-        return this.renderStructVar(grv, index);
+        return this.renderStructVar(grv);
       case TableType.EnumDef:
         const tge = Object.create(GameEnumVal.prototype);
         const ge = Object.assign(tge, item);
@@ -401,8 +436,8 @@ export class MapTable extends LitElement {
           ${this.getHeadings().map(heading => html`
             <th>${heading}</th>`)}
         </tr>
-        ${this.data.map((item: unknown, index: number) => {
-          return this.renderRow(item, index);
+        ${this.data.map((item: unknown) => {
+          return this.renderRow(item);
         })}
       </table>
     `;

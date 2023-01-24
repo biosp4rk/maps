@@ -85,9 +85,8 @@ class GameVar {
     let decl = parts[1];
     // find inner most part of declaration
     let i = decl.lastIndexOf('(');
-    if (i == -1) {
-      i = 0;
-    }
+    // if i == -1, it needs to be 0 anyway
+    i++;
     // check for pointer
     return decl[i] == '*';
   }
