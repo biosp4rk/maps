@@ -1,4 +1,5 @@
-import { css, customElement, html, LitElement, property } from 'lit-element';
+import { LitElement, html, css } from 'lit';
+import { property, customElement } from 'lit/decorators.js';
 import { TableType } from "./map-table";
 import { GameStructList, GameEnumList, GameStruct } from './entry-types';
 import {

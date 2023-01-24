@@ -1,4 +1,5 @@
-import { css, customElement, html, LitElement, property } from 'lit-element';
+import { LitElement, html, css } from 'lit';
+import { property, customElement } from 'lit/decorators.js';
 import {
   GameVar, GameAbsVar, GameRelVar, GameStructList,
   GameEnumList, GameCode, GameEnumVal, GameStruct
