@@ -245,6 +245,9 @@ export class MapApp extends LitElement {
     if (!this.game || !this.region || !this.map) {
       return;
     }
+    
+    this.clearFilter();
+
     // read data from json files
     this.fetchingData = true;
     const targetBaseUrl = `/json/${this.game}/`;
@@ -274,7 +277,6 @@ export class MapApp extends LitElement {
 
     this.filterData = this.allData;
     this.pageIndex = 0;
-    this.clearFilter();
     this.setUrlParams();
 
     this.fetchingData = false;
@@ -357,7 +359,9 @@ export class MapApp extends LitElement {
 
   private clearFilter() {
     const box = this.shadowRoot?.querySelector('input.search-box') as HTMLInputElement;
-    box.value = '';
+    if (box) {
+      box.value = '';
+    }
   }
 
   private resetFilter() {
