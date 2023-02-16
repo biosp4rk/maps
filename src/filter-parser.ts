@@ -26,9 +26,6 @@ export class FilterParser {
   private static index: number;
   private static items: Array<FilterItem>;
   private static exclude: boolean;
-  //private static terms: Array<string>;
-  //private static quotes: Array<string>;
-  //private static regexes: Array<string>;
 
   public static parse(filter: string): Array<FilterItem> {
     // setup
