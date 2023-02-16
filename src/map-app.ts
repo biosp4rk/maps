@@ -10,6 +10,7 @@ import { FilterItem, FilterParser, SearchType } from './filter-parser';
 const URL_GAME = 'game';
 const URL_MAP = 'map';
 const URL_REGION = 'region';
+const URL_FILTER = 'filter';
 
 const REGIONS = ['U', 'E', 'J'];
 
@@ -179,6 +180,7 @@ export class MapApp extends LitElement {
   /** hide table while fetching data */
   @property({ type: Boolean }) fetchingData = false;
 
+  private filter: string = '';
   /** Columns that should not be displayed */
   private hiddenColumns: Set<string> = new Set<string>([KEY_TAGS, KEY_LABEL, KEY_NOTES]);
   private pageSize: number = 1000;
@@ -187,16 +189,20 @@ export class MapApp extends LitElement {
   constructor() {
     super();
     this.parseUrlParams();
-    this.fetchData();
+    this.fetchData(true);
     document.body.addEventListener('keyup', (e: Event) => {
       if ((e as KeyboardEvent).key == 'Escape') {
         this.resetFilter();
       }
-    })
+    });
+  }
+
+  override firstUpdated() {
+    this.setFilterText(this.filter);
   }
 
   private parseUrlParams() {
-    // check for game, region, and map in search params
+    // check for game, region, and map
     const params = new URLSearchParams(window.location.search);
     const game = params.get(URL_GAME) || '';
     if (GAMES.some(x => x.value === game)) {
@@ -210,6 +216,11 @@ export class MapApp extends LitElement {
     if (MAPS.some(x => x.value === map)) {
       this.map = map;
     }
+    // check for filter
+    const filter = params.get(URL_FILTER);
+    if (filter) {
+      this.filter = filter;
+    }
   }
 
   private setUrlParams() {
@@ -217,6 +228,9 @@ export class MapApp extends LitElement {
     params.set(URL_GAME, this.game);
     params.set(URL_REGION, this.region.toLowerCase());
     params.set(URL_MAP, this.map);
+    if (this.filter) {
+      params.set(URL_FILTER, this.filter);
+    }
     const url = window.location.pathname + '?' + params.toString();
     window.history.replaceState(null, '', url);
   }
@@ -241,12 +255,14 @@ export class MapApp extends LitElement {
     }
   }
 
-  async fetchData() {
+  async fetchData(first: boolean = false) {
     if (!this.game || !this.region || !this.map) {
       return;
     }
     
-    this.clearFilter();
+    if (!first) {
+      this.clearFilter();
+    }
 
     // read data from json files
     this.fetchingData = true;
@@ -274,10 +290,16 @@ export class MapApp extends LitElement {
     // filter data by region
     fullData.forEach(entry => this.getRegionEntry(entry));
     this.allData = fullData.filter(entry => entry.addr !== null);
-
     this.filterData = this.allData;
-    this.pageIndex = 0;
-    this.setUrlParams();
+    // check if loading page with filter
+    if (first && this.filter) {
+      this.applyFilter();
+    }
+
+    if (!first) {
+      this.pageIndex = 0;
+      this.setUrlParams();
+    }
 
     this.fetchingData = false;
   }
@@ -285,8 +307,22 @@ export class MapApp extends LitElement {
   private inputHandler(e: Event) {
     let ke = (e as KeyboardEvent);
     if (ke.key == 'Enter') {
-      this.applyFilter();
+      this.userApplyFilter();
     }
+  }
+
+  private getFilterBox(): HTMLInputElement {
+    return this.shadowRoot?.querySelector('input.search-box') as HTMLInputElement;
+  }
+
+  private getFilterText(): string {
+    const box = this.getFilterBox();
+    return box.value;
+  }
+
+  private setFilterText(text: string) {
+    const box = this.getFilterBox();
+    box.value = text;
   }
 
   private checkFiltersOnDesc(desc: string, items: Array<FilterItem>): boolean {
@@ -313,15 +349,8 @@ export class MapApp extends LitElement {
   }
 
   private applyFilter() {
-    const box = this.shadowRoot?.querySelector('input.search-box') as HTMLInputElement;
-    const text = box.value;
-    if (text === '') {
-      this.resetFilter();
-      return;
-    }
-
     // parse to get filter items
-    const items = FilterParser.parse(text);
+    const items = FilterParser.parse(this.filter);
     const checkStruct = this.filterStructs();
     const checkEnum = this.filterEnums();
 
@@ -354,14 +383,25 @@ export class MapApp extends LitElement {
       }
       return false;
     });
+  }
+
+  private userApplyFilter() {
+    const text = this.getFilterText();
+    if (text === '') {
+      this.resetFilter();
+      return;
+    }
+
+    this.filter = text;
+    this.applyFilter();
     this.collapseAll();
+    this.setUrlParams();
   }
 
   private clearFilter() {
-    const box = this.shadowRoot?.querySelector('input.search-box') as HTMLInputElement;
-    if (box) {
-      box.value = '';
-    }
+    this.filter = '';
+    this.setFilterText('');
+    this.setUrlParams();
   }
 
   private resetFilter() {
@@ -500,7 +540,7 @@ export class MapApp extends LitElement {
                 <input class="search-box" @keyup='${this.inputHandler}'/>
               </div>
               <div>
-                <button @click="${this.applyFilter}">Apply</button>
+                <button @click="${this.userApplyFilter}">Apply</button>
                 <button @click="${this.resetFilter}">Reset</button>
                 <button @click="${this.collapseAll}">Collapse All</button>
               </div>

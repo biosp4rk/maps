@@ -13,9 +13,6 @@ export class FilterItem {
     }
 }
 export class FilterParser {
-    //private static terms: Array<string>;
-    //private static quotes: Array<string>;
-    //private static regexes: Array<string>;
     static parse(filter) {
         // setup
         this.filter = filter;
