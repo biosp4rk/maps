@@ -1,8 +1,27 @@
+// Grammar:
+// Space -> /\s+/
+// Hex -> /[0-9A-F]+/
+// Filter -> FilterItem (Space FilterItem)*
+// FilterItem -> Term | Quote | Regex | Addr
+// Term -> /\S+/
+// Quote -> '"' /[^"]*/ '"'
+// Regex -> '/' /[^/]*/ '/'
+// Addr -> AddrEQ | AddrGT | AddrLT | AddrGE | AddrLE
+// AddrEQ -> '=' Hex
+// AddrGT -> '>' Hex
+// AddrLT -> '<' Hex
+// AddrGE -> '>=' Hex
+// AddrLE -> '<=' Hex
 export var SearchType;
 (function (SearchType) {
     SearchType[SearchType["Term"] = 0] = "Term";
     SearchType[SearchType["Quote"] = 1] = "Quote";
     SearchType[SearchType["Regex"] = 2] = "Regex";
+    SearchType[SearchType["AddrEQ"] = 3] = "AddrEQ";
+    SearchType[SearchType["AddrGT"] = 4] = "AddrGT";
+    SearchType[SearchType["AddrLT"] = 5] = "AddrLT";
+    SearchType[SearchType["AddrGE"] = 6] = "AddrGE";
+    SearchType[SearchType["AddrLE"] = 7] = "AddrLE";
 })(SearchType || (SearchType = {}));
 export class FilterItem {
     constructor(type, exclude, text = '') {
@@ -20,17 +39,30 @@ export class FilterParser {
         // parse
         this.parseFilterStart();
         // finalize results
+        let results = [];
         for (const item of this.items) {
-            if (item.type === SearchType.Regex) {
-                // create RegExp objects now (avoid making them on the fly later)
-                item.regex = new RegExp(item.text, 'i');
+            switch (item.type) {
+                case SearchType.Regex:
+                    // create RegExp objects now (avoid making them on the fly later)
+                    item.regex = new RegExp(item.text, 'i');
+                    break;
+                case SearchType.AddrEQ:
+                case SearchType.AddrGT:
+                case SearchType.AddrLT:
+                case SearchType.AddrGE:
+                case SearchType.AddrLE:
+                    // exclude addr filter if not valid hex
+                    if (!/(0x)?[0-9A-Fa-f]+/.test(item.text)) {
+                        continue;
+                    }
+                    break;
+                default:
+                    // lowercase terms and quotes
+                    item.text = item.text.toLowerCase();
+                    break;
             }
-            else {
-                // lowercase terms and quotes
-                item.text = item.text.toLowerCase();
-            }
+            results.push(item);
         }
-        const results = this.items;
         this.reset();
         return results;
     }
@@ -54,6 +86,65 @@ export class FilterParser {
             return;
         }
         const c = this.filter[this.index++];
+        if (this.tryParseFilterAddr(c)) {
+            return;
+        }
+        if (c === '-') {
+            this.exclude = true;
+            this.parseFilterText();
+        }
+        else if (c === ' ') {
+            this.parseFilterSpace();
+        }
+        else {
+            this.parseFilterNonAddr(c);
+        }
+    }
+    static tryParseFilterAddr(c) {
+        if (this.index >= this.filter.length) {
+            return false;
+        }
+        let searchType;
+        if (c === "=") {
+            // double equals is also allowed,
+            // so skip second equals if present
+            if (this.filter[this.index] === "=") {
+                this.index++;
+            }
+            searchType = SearchType.AddrEQ;
+        }
+        else if (c === ">") {
+            if (this.filter[this.index] === "=") {
+                this.index++;
+                searchType = SearchType.AddrGE;
+            }
+            else {
+                searchType = SearchType.AddrGT;
+            }
+        }
+        else if (c === "<") {
+            if (this.filter[this.index] === "=") {
+                this.index++;
+                searchType = SearchType.AddrLE;
+            }
+            else {
+                searchType = SearchType.AddrLT;
+            }
+        }
+        else {
+            return false;
+        }
+        // add new filter item
+        const item = new FilterItem(searchType, this.exclude);
+        this.items.push(item);
+        this.parseFilterTerm();
+        return true;
+    }
+    static parseFilterNonAddr(c) {
+        if (this.index >= this.filter.length) {
+            return;
+        }
+        // item text is expected, so don't check for minus or space
         if (c === '"') {
             this.items.push(new FilterItem(SearchType.Quote, this.exclude));
             this.parseFilterQuote();
@@ -61,13 +152,6 @@ export class FilterParser {
         else if (c === '/') {
             this.items.push(new FilterItem(SearchType.Regex, this.exclude));
             this.parseFilterRegex();
-        }
-        else if (c === '-') {
-            this.exclude = true;
-            this.parseFilterText();
-        }
-        else if (c === ' ') {
-            this.parseFilterSpace();
         }
         else {
             this.items.push(new FilterItem(SearchType.Term, this.exclude, c));
@@ -80,21 +164,15 @@ export class FilterParser {
         }
         // new item is expected, so check for minus but not space
         const c = this.filter[this.index++];
-        if (c === '"') {
-            this.items.push(new FilterItem(SearchType.Quote, this.exclude));
-            this.parseFilterQuote();
+        if (this.tryParseFilterAddr(c)) {
+            return;
         }
-        else if (c === '/') {
-            this.items.push(new FilterItem(SearchType.Regex, this.exclude));
-            this.parseFilterRegex();
-        }
-        else if (c === '-') {
+        if (c === '-') {
             this.exclude = true;
             this.parseFilterText();
         }
         else {
-            this.items.push(new FilterItem(SearchType.Term, this.exclude, c));
-            this.parseFilterTerm();
+            this.parseFilterNonAddr(c);
         }
     }
     static parseFilterText() {
@@ -103,18 +181,10 @@ export class FilterParser {
         }
         // item text is expected, so don't check for minus or space
         const c = this.filter[this.index++];
-        if (c === '"') {
-            this.items.push(new FilterItem(SearchType.Quote, this.exclude));
-            this.parseFilterQuote();
+        if (this.tryParseFilterAddr(c)) {
+            return;
         }
-        else if (c === '/') {
-            this.items.push(new FilterItem(SearchType.Regex, this.exclude));
-            this.parseFilterRegex();
-        }
-        else {
-            this.items.push(new FilterItem(SearchType.Term, this.exclude, c));
-            this.parseFilterTerm();
-        }
+        this.parseFilterNonAddr(c);
     }
     static parseFilterQuote() {
         this.exclude = false;

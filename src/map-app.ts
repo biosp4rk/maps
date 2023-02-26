@@ -3,7 +3,7 @@ import { property, customElement } from 'lit/decorators.js';
 import { TableType } from "./map-table";
 import { GameStructList, GameEnumList, GameStruct } from './entry-types';
 import {
-  KEY_LABEL, KEY_TAGS, KEY_TYPE, KEY_ENUM, KEY_DESC, KEY_NOTES, getHideableColumns
+  KEY_LABEL, KEY_ADDR, KEY_TAGS, KEY_TYPE, KEY_ENUM, KEY_DESC, KEY_NOTES, getHideableColumns
 } from './headings'
 import { FilterItem, FilterParser, SearchType } from './filter-parser';
 
@@ -189,7 +189,7 @@ export class MapApp extends LitElement {
   constructor() {
     super();
     this.parseUrlParams();
-    this.fetchData(true);
+    this.fetchData(true, false);
     document.body.addEventListener('keyup', (e: Event) => {
       if ((e as KeyboardEvent).key == 'Escape') {
         this.resetFilter();
@@ -255,12 +255,12 @@ export class MapApp extends LitElement {
     }
   }
 
-  async fetchData(first: boolean = false) {
+  async fetchData(first: boolean, keepFilter: boolean) {
     if (!this.game || !this.region || !this.map) {
       return;
     }
     
-    if (!first) {
+    if (!first && !keepFilter) {
       this.clearFilter();
     }
 
@@ -292,7 +292,7 @@ export class MapApp extends LitElement {
     this.allData = fullData.filter(entry => entry.addr !== null);
     this.filterData = this.allData;
     // check if loading page with filter
-    if (first && this.filter) {
+    if ((first || keepFilter) && this.filter) {
       this.applyFilter();
     }
 
@@ -323,6 +323,40 @@ export class MapApp extends LitElement {
   private setFilterText(text: string) {
     const box = this.getFilterBox();
     box.value = text;
+  }
+
+  private checkFiltersOnAddr(addr: number, items: Array<FilterItem>): boolean {
+      // check each item in filter
+      for (const item of items) {
+        switch (item.type) {
+          case SearchType.AddrEQ:
+            if ((addr === parseInt(item.text, 16)) === item.exclude) {
+              return false;
+            }
+            break;
+          case SearchType.AddrGT:
+            if ((addr > parseInt(item.text, 16)) === item.exclude) {
+              return false;
+            }
+            break;
+          case SearchType.AddrLT:
+            if ((addr < parseInt(item.text, 16)) === item.exclude) {
+              return false;
+            }
+            break;
+          case SearchType.AddrGE:
+            if ((addr >= parseInt(item.text, 16)) === item.exclude) {
+              return false;
+            }
+            break;
+          case SearchType.AddrLE:
+            if ((addr <= parseInt(item.text, 16)) === item.exclude) {
+              return false;
+            }
+            break;
+        }
+      }
+      return true;
   }
 
   private checkFiltersOnDesc(desc: string, items: Array<FilterItem>): boolean {
@@ -357,8 +391,10 @@ export class MapApp extends LitElement {
     this.pageIndex = 0;
     this.filterData = this.allData.filter(entry => {
       // check entry's description
+      const addr = parseInt(entry[KEY_ADDR] as string, 16);
       const desc = entry[KEY_DESC] as string;
-      if (this.checkFiltersOnDesc(desc, items)) {
+      if (this.checkFiltersOnAddr(addr, items) &&
+        this.checkFiltersOnDesc(desc, items)) {
         return true;
       }
       // check if entry is struct
@@ -430,21 +466,21 @@ export class MapApp extends LitElement {
     this.game =
       (this.shadowRoot!.querySelector('#game-select')! as HTMLInputElement)
         .value;
-    this.fetchData();
+    this.fetchData(false, false);
   }
 
   private regionChangeHandler() {
     this.region =
       (this.shadowRoot!.querySelector('#region-select')! as HTMLInputElement)
         .value;
-    this.fetchData();
+    this.fetchData(false, true);
   }
 
   private mapChangeHandler() {
     this.map =
       (this.shadowRoot!.querySelector('#map-select')! as HTMLInputElement)
         .value;
-    this.fetchData();
+    this.fetchData(false, false);
   }
 
   private toggleColumn(event: any) {
