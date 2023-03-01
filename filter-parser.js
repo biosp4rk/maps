@@ -6,12 +6,14 @@
 // Term -> /\S+/
 // Quote -> '"' /[^"]*/ '"'
 // Regex -> '/' /[^/]*/ '/'
-// Addr -> AddrEQ | AddrGT | AddrLT | AddrGE | AddrLE
+// Addr -> AddrEQ | AddrGT | AddrLT | AddrGE | AddrLE | AddrNear
 // AddrEQ -> '=' Hex
 // AddrGT -> '>' Hex
 // AddrLT -> '<' Hex
 // AddrGE -> '>=' Hex
 // AddrLE -> '<=' Hex
+// AddrNear -> '~' Hex
+const ROM_OFFSET = 0x8000000;
 export var SearchType;
 (function (SearchType) {
     SearchType[SearchType["Term"] = 0] = "Term";
@@ -22,12 +24,14 @@ export var SearchType;
     SearchType[SearchType["AddrLT"] = 5] = "AddrLT";
     SearchType[SearchType["AddrGE"] = 6] = "AddrGE";
     SearchType[SearchType["AddrLE"] = 7] = "AddrLE";
+    SearchType[SearchType["AddrNear"] = 8] = "AddrNear";
 })(SearchType || (SearchType = {}));
 export class FilterItem {
     constructor(type, exclude, text = '') {
         this.text = text;
         this.type = type;
         this.exclude = exclude;
+        this.addr = null;
         this.regex = null;
     }
 }
@@ -51,9 +55,15 @@ export class FilterParser {
                 case SearchType.AddrLT:
                 case SearchType.AddrGE:
                 case SearchType.AddrLE:
+                case SearchType.AddrNear:
                     // exclude addr filter if not valid hex
                     if (!/(0x)?[0-9A-Fa-f]+/.test(item.text)) {
                         continue;
+                    }
+                    item.addr = parseInt(item.text, 16);
+                    // check if virtual rom address
+                    if (item.addr >= ROM_OFFSET) {
+                        item.addr -= ROM_OFFSET;
                     }
                     break;
                 default:
@@ -131,6 +141,9 @@ export class FilterParser {
                 searchType = SearchType.AddrLT;
             }
         }
+        else if (c === "~") {
+            searchType = SearchType.AddrNear;
+        }
         else {
             return false;
         }
@@ -141,9 +154,6 @@ export class FilterParser {
         return true;
     }
     static parseFilterNonAddr(c) {
-        if (this.index >= this.filter.length) {
-            return;
-        }
         // item text is expected, so don't check for minus or space
         if (c === '"') {
             this.items.push(new FilterItem(SearchType.Quote, this.exclude));
