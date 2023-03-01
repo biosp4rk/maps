@@ -6,13 +6,16 @@
 // Term -> /\S+/
 // Quote -> '"' /[^"]*/ '"'
 // Regex -> '/' /[^/]*/ '/'
-// Addr -> AddrEQ | AddrGT | AddrLT | AddrGE | AddrLE
+// Addr -> AddrEQ | AddrGT | AddrLT | AddrGE | AddrLE | AddrNear
 // AddrEQ -> '=' Hex
 // AddrGT -> '>' Hex
 // AddrLT -> '<' Hex
 // AddrGE -> '>=' Hex
 // AddrLE -> '<=' Hex
+// AddrNear -> '~' Hex
 
+
+const ROM_OFFSET = 0x8000000;
 
 export enum SearchType {
   Term,
@@ -22,7 +25,8 @@ export enum SearchType {
   AddrGT,
   AddrLT,
   AddrGE,
-  AddrLE
+  AddrLE,
+  AddrNear
 }
 
 export class FilterItem {
@@ -30,12 +34,14 @@ export class FilterItem {
   public text: string;
   public type: SearchType;
   public exclude: boolean;
+  public addr: number | null;
   public regex: RegExp | null;
   
   constructor(type: SearchType, exclude: boolean, text: string = '') {
     this.text = text;
     this.type = type;
     this.exclude = exclude;
+    this.addr = null;
     this.regex = null;
   }
 
@@ -69,9 +75,15 @@ export class FilterParser {
         case SearchType.AddrLT:
         case SearchType.AddrGE:
         case SearchType.AddrLE:
+        case SearchType.AddrNear:
           // exclude addr filter if not valid hex
           if (!/(0x)?[0-9A-Fa-f]+/.test(item.text)) {
             continue;
+          }
+          item.addr = parseInt(item.text, 16);
+          // check if virtual rom address
+          if (item.addr >= ROM_OFFSET) {
+            item.addr -= ROM_OFFSET;
           }
           break;
         default:
@@ -148,6 +160,8 @@ export class FilterParser {
       } else {
         searchType = SearchType.AddrLT;
       }
+    } else if (c === "~") {
+        searchType = SearchType.AddrNear;
     } else {
       return false;
     }
@@ -159,9 +173,6 @@ export class FilterParser {
   }
 
   private static parseFilterNonAddr(c: string): void {
-    if (this.index >= this.filter.length) {
-      return;
-    }
     // item text is expected, so don't check for minus or space
     if (c === '"') {
       this.items.push(new FilterItem(SearchType.Quote, this.exclude));

@@ -6,12 +6,14 @@ export declare enum SearchType {
     AddrGT = 4,
     AddrLT = 5,
     AddrGE = 6,
-    AddrLE = 7
+    AddrLE = 7,
+    AddrNear = 8
 }
 export declare class FilterItem {
     text: string;
     type: SearchType;
     exclude: boolean;
+    addr: number | null;
     regex: RegExp | null;
     constructor(type: SearchType, exclude: boolean, text?: string);
 }

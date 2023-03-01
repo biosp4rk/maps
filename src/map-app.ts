@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
-import { TableType } from "./map-table";
-import { GameStructList, GameEnumList, GameStruct } from './entry-types';
+import { TableType } from './map-table';
+import { GameAbsVar, GameCode, GameStructList, GameEnumList, GameStruct } from './entry-types';
 import {
   KEY_LABEL, KEY_ADDR, KEY_TAGS, KEY_TYPE, KEY_ENUM, KEY_DESC, KEY_NOTES, getHideableColumns
 } from './headings'
@@ -325,61 +325,121 @@ export class MapApp extends LitElement {
     box.value = text;
   }
 
-  private checkFiltersOnAddr(addr: number, items: Array<FilterItem>): boolean {
-      // check each item in filter
-      for (const item of items) {
-        switch (item.type) {
-          case SearchType.AddrEQ:
-            if ((addr === parseInt(item.text, 16)) === item.exclude) {
-              return false;
-            }
-            break;
-          case SearchType.AddrGT:
-            if ((addr > parseInt(item.text, 16)) === item.exclude) {
-              return false;
-            }
-            break;
-          case SearchType.AddrLT:
-            if ((addr < parseInt(item.text, 16)) === item.exclude) {
-              return false;
-            }
-            break;
-          case SearchType.AddrGE:
-            if ((addr >= parseInt(item.text, 16)) === item.exclude) {
-              return false;
-            }
-            break;
-          case SearchType.AddrLE:
-            if ((addr <= parseInt(item.text, 16)) === item.exclude) {
-              return false;
-            }
-            break;
-        }
-      }
-      return true;
-  }
-
-  private checkFiltersOnDesc(desc: string, items: Array<FilterItem>): boolean {
+  private checkDescFilter(
+    desc: string,
+    item: FilterItem,
+    type: string = '',
+    enm: string = ''
+  ): boolean {
     // get description and its terms for searching
-    const descLower = desc.toLowerCase();
-    const descTerms = descLower.split(' ');
-    // check each item in filter
-    for (const item of items) {
-      if (item.type === SearchType.Term) {
-        if (descTerms.includes(item.text) === item.exclude) {
-          return false;
-        }
-      } else if (item.type === SearchType.Quote) {
-        if (descLower.includes(item.text) === item.exclude) {
-          return false;
-        }
-      } else if (item.type === SearchType.Regex) {
-        if (item.regex!.test(desc) === item.exclude) {
-          return false;
-        }
+    desc = desc.toLowerCase();
+    const descTerms = desc.split(' ');
+    // check description
+    if (item.type === SearchType.Term) {
+      if (descTerms.includes(item.text) !== item.exclude) {
+        return true;
+      }
+    } else if (item.type === SearchType.Quote) {
+      if (desc.includes(item.text) !== item.exclude) {
+        return true;
+      }
+    } else if (item.type === SearchType.Regex) {
+      if (item.regex!.test(desc) !== item.exclude) {
+        return true;
       }
     }
-    return true;
+    // check if entry is struct
+    if (type && type in this.structs) {
+      const es = this.structs[type];
+      if (es.vars.some(rv => this.checkDescFilter(rv.desc, item, rv.type, rv.enum))) {
+        return true;
+      }
+    }
+    // check if entry has enum
+    if (enm && enm in this.enums) {
+      const ee = this.enums[enm];
+      if (ee.some(ev => this.checkDescFilter(ev.desc, item))) {
+        return true;
+      }
+    }
+    // did not match desc, struct var, or enum val
+    return false;
+  }
+
+  private checkAddrFilter(addr: number, item: FilterItem): boolean {
+    switch (item.type) {
+      case SearchType.AddrEQ:
+        if ((addr === item.addr!) !== item.exclude) {
+          return true;
+        }
+        break;
+      case SearchType.AddrGT:
+        if ((addr > item.addr!) !== item.exclude) {
+          return true;
+        }
+        break;
+      case SearchType.AddrLT:
+        if ((addr < item.addr!) !== item.exclude) {
+          return true;
+        }
+        break;
+      case SearchType.AddrGE:
+        if ((addr >= item.addr!) !== item.exclude) {
+          return true;
+        }
+        break;
+      case SearchType.AddrLE:
+        if ((addr <= item.addr!) !== item.exclude) {
+          return true;
+        }
+        break;
+    }
+    return false;
+  }
+
+  private handleNearAddrFilter(item: FilterItem) {
+    const target = item.addr!
+    // find index of first entry past address
+    // TODO: binary search
+    let idx = this.filterData.findIndex(entry => {
+      const addr = parseInt(entry[KEY_ADDR] as string, 16)
+      return addr > target;
+    });
+    let exact = false;
+    if (idx === -1) {
+      idx = this.filterData.length;
+    }
+    if (idx - 1 >= 0) {
+      // check if exact match
+      let addr;
+      let size;
+      const tableType = this.getTableType();
+      const entry = this.filterData[idx - 1];
+      if (tableType === TableType.CodeList) {
+        const tgc = Object.create(GameCode.prototype);
+        const gc = Object.assign(tgc, entry);
+        addr = parseInt(gc.addr, 16);
+        size = parseInt(gc.size, 16);
+      } else {
+        const tgc = Object.create(GameAbsVar.prototype);
+        const gav = Object.assign(tgc, entry);
+        addr = parseInt(gav.addr, 16);
+        size = gav.getLength(this.structs);
+      }
+      if (target >= addr && target < addr + size) {
+        exact = true;
+      }
+    }
+    // get left/right entries
+    let left = idx - 1;
+    if (exact) { left--; }
+    if (left < 0) { left = 0; }
+    let right = idx;
+    const numEntries = this.filterData.length;
+    if (right >= numEntries) {
+      right = numEntries - 1;
+    }
+    this.filterData = this.filterData.slice(left, right + 1);
   }
 
   private applyFilter() {
@@ -387,38 +447,37 @@ export class MapApp extends LitElement {
     const items = FilterParser.parse(this.filter);
     const checkStruct = this.filterStructs();
     const checkEnum = this.filterEnums();
-
     this.pageIndex = 0;
-    this.filterData = this.allData.filter(entry => {
-      // check entry's description
-      const addr = parseInt(entry[KEY_ADDR] as string, 16);
-      const desc = entry[KEY_DESC] as string;
-      if (this.checkFiltersOnAddr(addr, items) &&
-        this.checkFiltersOnDesc(desc, items)) {
-        return true;
+
+    // check each filter item
+    this.filterData = this.allData;
+    for (const item of items) {
+      switch (item.type) {
+        case SearchType.Term:
+        case SearchType.Quote:
+        case SearchType.Regex:
+          this.filterData = this.filterData.filter(entry => {
+            const desc = entry[KEY_DESC] as string;
+            const type = checkStruct ? entry[KEY_TYPE] as string : '';
+            const enm = checkEnum ? entry[KEY_ENUM] as string : '';
+            return this.checkDescFilter(desc, item, type, enm);
+          });
+          break;
+        case SearchType.AddrEQ:
+        case SearchType.AddrGT:
+        case SearchType.AddrLT:
+        case SearchType.AddrGE:
+        case SearchType.AddrLE:
+          this.filterData = this.filterData.filter(entry => {
+            const addr = parseInt(entry[KEY_ADDR] as string, 16);
+            return this.checkAddrFilter(addr, item);
+          });
+          break;
+        case SearchType.AddrNear:
+          this.handleNearAddrFilter(item);
+          break;
       }
-      // check if entry is struct
-      if (checkStruct && KEY_TYPE in entry) {
-        const name = entry[KEY_TYPE] as string;
-        if (name in this.structs) {
-          const es = this.structs[name];
-          if (es.vars.some(rv => this.checkFiltersOnDesc(rv.desc, items))) {
-            return true;
-          }
-        }
-      }
-      // check if entry has enum
-      if (checkEnum && KEY_ENUM in entry) {
-        const name = entry[KEY_ENUM] as string;
-        if (name in this.enums) {
-          const ee = this.enums[name];
-          if (ee.some(ev => this.checkFiltersOnDesc(ev.desc, items))) {
-            return true;
-          }
-        }
-      }
-      return false;
-    });
+    }
   }
 
   private userApplyFilter() {
