@@ -1,60 +1,174 @@
 export {
-  GameVar, GameRelVar, GameAbsVar, GameCode, GameStruct, GameEnumVal, 
-  GameStructList, GameEnumList
+  GameEntry, GameVar, GameRelVar, GameAbsVar, GameDataVar, GameCode,
+  GameStruct, GameEnumVal, GameEnum, GameStructList, GameEnumList
 };
-import { toHex, getPrimSize } from "./utils";
+import { toHex } from "./utils";
+import {
+  KEY_ADDR, KEY_COUNT, KEY_DESC, KEY_ENUM, KEY_LABEL, KEY_MODE, KEY_NOTES,
+  KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL
+} from "./headings";
 
+export type DictEntry = {[key: string]: unknown};
 
-class GameVar {
+function swap_key_value(obj: any): any {
+  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [v, k]));
+}
+
+export enum PrimType {
+  U8,
+  S8,
+  Bool,
+  U16,
+  S16,
+  U32,
+  S32,
+  Struct,
+  Void
+}
+
+const PRIM_TO_STR = {
+  [PrimType.U8]: 'u8',
+  [PrimType.S8]: 's8',
+  [PrimType.Bool]: 'bool',
+  [PrimType.U16]: 'u16',
+  [PrimType.S16]: 's16',
+  [PrimType.U32]: 'u32',
+  [PrimType.S32]: 's32',
+  [PrimType.Struct]: 'struct',
+  [PrimType.Void]: 'void'
+}
+
+const STR_TO_PRIM = swap_key_value(PRIM_TO_STR);
+
+enum DataTag {
+  Flags,
+  Ascii,
+  Text,
+  Rle,
+  LZ,
+  Gfx,
+  Tilemap,
+  Palette,
+  OamFrame,
+  BGBlocks,
+  BGMap,
+  Thumb,
+  Arm
+}
+
+const TAG_TO_STR = {
+  [DataTag.Flags]: "flags",
+  [DataTag.Ascii]: "ascii",
+  [DataTag.Text]: "text",
+  [DataTag.Rle]: "rle",
+  [DataTag.LZ]: "lz",
+  [DataTag.Gfx]: "gfx",
+  [DataTag.Tilemap]: "tilemap",
+  [DataTag.Palette]: "palette",
+  [DataTag.OamFrame]: "oam_frame",
+  [DataTag.BGBlocks]: "bg_blocks",
+  [DataTag.BGMap]: "bg_map",
+  [DataTag.Thumb]: "thumb",
+  [DataTag.Arm]: "arm"
+}
+
+const STR_TO_TAG = swap_key_value(TAG_TO_STR);
+
+enum CodeMode {
+  Thumb,
+  Arm
+}
+
+const MODE_TO_STR = {
+  [CodeMode.Thumb]: "thumb",
+  [CodeMode.Arm]: "arm",
+}
+
+const STR_TO_MODE = swap_key_value(MODE_TO_STR);
+
+abstract class GameEntry {
+
+}
+
+class GameVar extends GameEntry {
   desc!: string;
   label!: string;
-  type!: string;
-  tags?: string[];
+  arrCount?: number;
+  tags?: DataTag[];
   enum?: string;
   notes?: string;
+  // used for type
+  primitive!: PrimType;
+  structName?: string;
+  declaration?: string;
+
+  constructor(entry: DictEntry) {
+    super();
+    this.desc = entry[KEY_DESC] as string;
+    this.label = entry[KEY_LABEL] as string;
+    this.parseType(entry[KEY_TYPE] as string);
+    const arrCount = entry[KEY_COUNT] as string;
+    this.arrCount = arrCount ? parseInt(arrCount) : undefined;
+    this.tags = (entry[KEY_TAGS] as string[])?.map((t: string) => STR_TO_TAG[t]);
+    this.enum = entry[KEY_ENUM] as string;
+    this.notes = entry[KEY_NOTES] as string;
+  }
 
   /** Gets the number of items (1 unless array type) */
   getCount(): number {
-    let count = 1;
-    const parts = this.type.split(' ');
-    if (parts.length == 2) {
-      let decl = parts[1];
-      // get inner most part of declaration
-      const i = decl.lastIndexOf('(');
-      if (i != -1) {
-        const j = decl.indexOf(')');
-        decl = decl.slice(i + 1, j);
-      }
-      // check for pointer
-      if (decl.startsWith('*')) {
-        decl = decl.replace(/^\*+/, '');
-      }
-      // check for array
-      const dims = decl.match(/(0x)?[0-9A-F]+/g);
-      if (dims) {
-        for (const dim of dims) {
-          const radix = dim.startsWith('0x') ? 16 : 10;
-          count *= parseInt(dim, radix);
+    return this.arrCount ?? 1;
+  }
+
+  getSpecSize(structs: GameStructList) : number {
+    switch (+this.primitive) {
+      case PrimType.U8:
+      case PrimType.S8:
+      case PrimType.Bool:
+      case PrimType.Void:
+        return 1;
+      case PrimType.U16:
+      case PrimType.S16:
+        return 2
+      case PrimType.U32:
+      case PrimType.S32:
+        return 4;
+      case PrimType.Struct:
+        const se = structs[this.structName!];
+        if (se === undefined) {
+          throw new Error(`Invalid struct name ${this.structName}`);
         }
-      }
+        return se.size;
     }
-    return count;
+    return NaN;
   }
 
   /** Gets the physical size of an individual item */
   getSize(structs: GameStructList): number {
-    if (this.isPtr()) {
-      return 4;
+    let size = this.getSpecSize(structs);
+    if (!this.declaration) {
+      return size;
     }
-    const spec = this.spec();
-    const primSize = getPrimSize(spec);
-    if (!isNaN(primSize)) {
-      return primSize;
+    // get inner-most part of declaration
+    let decl = this.declaration;
+    let i = decl.lastIndexOf('(');
+    if (i !== -1) {
+      i++;
+      const j = decl.indexOf(')');
+      decl = decl.slice(i, j);
     }
-    if (spec in structs) {
-      return structs[spec].getSize();
+    // check for pointer
+    if (decl.startsWith('*')) {
+      size = 4;
+      decl = decl.replace(/^\*+/, '');
     }
-    throw new Error('Invalid type specifier ' + spec);
+    // check for array
+    const matches = decl.match(/\w+/g);
+    if (matches) {
+      for (const match of matches) {
+        size *= parseInt(match, 16);
+      }
+    }
+    return size;
   }
 
   /** Gets the total physical size of all items */
@@ -73,64 +187,106 @@ class GameVar {
   }
   
   spec(): string {
-    return this.type.split(' ')[0];
+    if (this.primitive === PrimType.Struct) {
+      return this.structName!;
+    }
+    return PRIM_TO_STR[this.primitive];
   }
 
-  private isPtr(): boolean {
-    // get second part of type string
-    const parts = this.type.split(' ');
-    if (parts.length != 2) {
-      return false;
+  tagStrs(): string[] | undefined {
+    return this.tags?.map(t => TAG_TO_STR[t]);
+  }
+
+  typeStr(): string {
+    let decl = this.declaration ?? '';
+    if (this.arrCount) {
+      let i = decl.lastIndexOf('*') + 1;
+      const arrStr = '[0x' + toHex(this.arrCount) + ']'
+      decl = decl.slice(0, i) + arrStr + decl.slice(i);
     }
-    let decl = parts[1];
-    // find inner most part of declaration
-    let i = decl.lastIndexOf('(');
-    // if i == -1, it needs to be 0 anyway
-    i++;
-    // check for pointer
-    return decl[i] == '*';
+    const spec = this.spec();
+    if (decl) {
+      return spec + ' ' + decl;
+    }
+    return spec;
+  }
+
+  private parseType(type: string) {
+    const parts = type.split(' ');
+    // primitive
+    const prim = parts[0];
+    let primType: PrimType = STR_TO_PRIM[prim];
+    if (primType !== undefined) {
+      this.primitive = primType;
+      this.structName = undefined;
+    } else {
+      this.primitive = PrimType.Struct;
+      this.structName = prim;
+    }
+    // declaration
+    if (parts.length == 2) {
+      this.declaration = parts[1];
+    } else {
+      this.declaration = undefined;
+    }
   }
 }
 
 class GameRelVar extends GameVar {
-  offset!: string;
+  offset!: number;
+
+  constructor(entry: DictEntry) {
+    super(entry);
+    this.offset = parseInt(entry[KEY_OFF] as string)
+  }
 
   /** Returns the address of this field in item 0 */
   getOffsetToolTip(parentAddr: number): string {
-    const off = parseInt(this.offset, 16);
-    return 'Address: ' + toHex(parentAddr + off);
+    return 'Address: ' + toHex(parentAddr + this.offset);
   }
 }
 
-class GameAbsVar extends GameVar {
-  addr!: string;
+interface GameAbsVar {
+  addr: number;
 
-  getAddr(): number {
-    return parseInt(this.addr, 16);
+}
+
+class GameDataVar extends GameVar implements GameAbsVar {
+  addr!: number;
+
+  constructor(entry: DictEntry) {
+    super(entry);
+    this.addr = parseInt(entry[KEY_ADDR] as string)
   }
 }
 
-class GameCode {
+class GameCode extends GameEntry implements GameAbsVar {
   desc!: string;
   label!: string;
-  addr!: string;
-  size!: string;
+  addr!: number;
+  size!: number;
   mode!: string;
-  params!: GameVar[];
-  return!: GameVar;
+  params?: GameVar[];
+  return?: GameVar;
   notes?: string;
 
-  getAddr(): number {
-    return parseInt(this.addr, 16);
-  }
-
-  getSize(): number {
-    return parseInt(this.size, 16);
+  constructor(entry: DictEntry) {
+    super();
+    this.desc = entry[KEY_DESC] as string;
+    this.label = entry[KEY_LABEL] as string;
+    this.addr = parseInt(entry[KEY_ADDR] as string);
+    this.size = parseInt(entry[KEY_SIZE] as string);
+    this.mode = STR_TO_MODE[entry[KEY_MODE] as string];
+    const params = entry[KEY_PARAMS] as DictEntry[];
+    this.params = params?.map(p => new GameVar(p));
+    const ret = entry[KEY_RET] as DictEntry;
+    this.return = ret ? new GameVar(ret) : undefined;
+    this.notes = entry[KEY_NOTES] as string;
   }
 
   /** Returns where the function ends */
   getToolTip(): string {
-    const funcEnd = this.getAddr() + this.getSize() - 1;
+    const funcEnd = this.addr + this.size - 1;
     return 'Ends at ' + toHex(funcEnd);
   }
 
@@ -143,21 +299,40 @@ class GameCode {
   }
 }
 
-class GameEnumVal {
+class GameEnumVal extends GameEntry {
   desc!: string;
   label!: string;
-  val!: string;
+  val!: number;
   notes?: string;
+
+  constructor(entry: DictEntry) {
+    super();
+    this.desc = entry[KEY_DESC] as string;
+    this.label = entry[KEY_LABEL] as string;
+    this.val = parseInt(entry[KEY_VAL] as string);
+    this.notes = entry[KEY_NOTES] as string;
+  }
 }
 
-class GameStruct {
-  size!: string;
+class GameEnum extends GameEntry {
+  vals!: GameEnumVal[];
+
+  constructor(entry: DictEntry) {
+    super();
+    this.vals = (entry['vals'] as DictEntry[]).map(v => new GameEnumVal(v));
+  }
+}
+
+class GameStruct extends GameEntry {
+  size!: number;
   vars!: GameRelVar[];
 
-  getSize(): number {
-    return parseInt(this.size, 16);
+  constructor(entry: DictEntry) {
+    super();
+    this.size = parseInt(entry[KEY_SIZE] as string);
+    this.vars = (entry['vars'] as DictEntry[]).map(v => new GameRelVar(v));
   }
 }
 
 type GameStructList = { [key: string]: GameStruct };
-type GameEnumList = { [key: string]: GameEnumVal[] };
+type GameEnumList = { [key: string]: GameEnum };

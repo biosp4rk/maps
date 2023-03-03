@@ -1,13 +1,13 @@
 import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import {
-  GameVar, GameAbsVar, GameRelVar, GameStructList,
+  GameEntry, GameVar, GameDataVar, GameRelVar, GameStructList,
   GameEnumList, GameCode, GameEnumVal, GameStruct
 } from './entry-types';
 import { toHex } from './utils';
 import {
-  KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_ARGS,
-  KEY_RET, KEY_OFF, KEY_VAL, KEY_NOTES, CATEGORIES, getHeading
+  KEY_ADDR, KEY_DESC, KEY_LABEL, KEY_LEN, KEY_NOTES, KEY_OFF,
+  KEY_PARAMS, KEY_RET, KEY_TAGS, KEY_TYPE, KEY_VAL, CATEGORIES, getHeading
 } from './headings';
 
 export enum TableType {
@@ -58,7 +58,7 @@ export class MapTable extends LitElement {
       background-color: #202020;
     }
 
-    .addr, .offset, .length {
+    .addr, .offset, .length, .val {
       font-family: "Courier New", monospace;
       text-align: right;
     }
@@ -134,7 +134,7 @@ export class MapTable extends LitElement {
   /** The type of data to display in the table */
   @property({ type: Number }) tableType: TableType = TableType.None;
   /** The JSON data to render */
-  @property({ type: Array }) data: Array<{ [key: string]: unknown }> = [];
+  @property({ type: Array }) entries: GameEntry[] = [];
   /** All struct definitions in the game */
   @property({ type: Object }) structs: GameStructList = {};
   /** All enum definitions in the game */
@@ -169,7 +169,7 @@ export class MapTable extends LitElement {
       case TableType.DataList:
         return [KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.CodeList:
-        return [KEY_ADDR, KEY_LEN, KEY_LABEL, KEY_DESC, KEY_ARGS, KEY_RET, KEY_NOTES];
+        return [KEY_ADDR, KEY_LEN, KEY_LABEL, KEY_DESC, KEY_PARAMS, KEY_RET, KEY_NOTES];
       case TableType.StructDef:
         return [KEY_OFF, KEY_LEN, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.EnumDef:
@@ -236,12 +236,12 @@ export class MapTable extends LitElement {
 
   private renderSubTable(entry: GameVar) {
     if (Boolean(entry.enum) && entry.enum! in this.enums) {
-      const vals: GameEnumVal[] = this.enums[entry.enum!];
+      const vals: GameEnumVal[] = this.enums[entry.enum!].vals;
       return this.renderEnumEntry(vals);
     } else if (entry.spec() in this.structs) {
       const gs = this.structs[entry.spec()];
       const pa = this.parentAddr ?
-        this.parentAddr : (entry as GameAbsVar).getAddr();
+        this.parentAddr : (entry as GameDataVar).addr;
       return this.renderStructEntry(gs, pa);
     }
     return '';
@@ -279,12 +279,12 @@ export class MapTable extends LitElement {
     return html`<td class="notes">${notes}</td>`
   }
 
-  private renderAbsVarEntry(entry: GameAbsVar) {
+  private renderDataVarEntry(entry: GameDataVar) {
     return html`<tr>
-      <td class="addr">${entry.addr}</td>
+      <td class="addr">${toHex(entry.addr)}</td>
       ${this.renderVarLength(entry)}
-      ${this.renderTags(entry.tags)}
-      ${this.renderType(entry.type)}
+      ${this.renderTags(entry.tagStrs())}
+      ${this.renderType(entry.typeStr())}
       ${this.renderLabel(entry.label)}
       ${this.renderDesc(entry)}
       ${this.renderNotes(entry.notes)}
@@ -295,7 +295,7 @@ export class MapTable extends LitElement {
     if (this.hiddenColumns.has(KEY_LEN)) {
       return '';
     }
-    const len = toHex(entry.getSize());
+    const len = toHex(entry.size);
     const toolTip = entry.getToolTip();
     return html`<td>
       <div class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
@@ -322,20 +322,20 @@ export class MapTable extends LitElement {
 
   private renderCodeVar(cv: GameVar, paramIdx: number, entryLabel: string) {
     return html`<div>
-      <span class="inline-type">${cv.type}</span>
+      <span class="inline-type">${cv.typeStr()}</span>
       ${this.renderCodeVarDesc(cv, paramIdx, entryLabel)}
     </div>`;
   }
 
   private renderCodeArgs(entry: GameCode) {
-    if (this.hiddenColumns.has(KEY_ARGS)) {
+    if (this.hiddenColumns.has(KEY_PARAMS)) {
       return '';
     }
-    const args = entry.params;
-    if (args === null) {
+    const params = entry.params;
+    if (!params) {
       return html`<td>void</td>`;
     }
-    return html`<td class="params">${args.map(
+    return html`<td class="params">${params.map(
       (arg, pIdx) => this.renderCodeVar(arg, pIdx, entry.label))}
     </td>`;
   }
@@ -345,7 +345,7 @@ export class MapTable extends LitElement {
       return '';
     }
     const ret = entry.return;
-    if (ret === null) {
+    if (!ret) {
       return html`<td>void</td>`;
     }
     return html`<td class="returns">${this.renderCodeVar(ret, -1, entry.label)}</td>`;
@@ -353,7 +353,7 @@ export class MapTable extends LitElement {
 
   private renderCodeEntry(entry: GameCode) {
     return html`<tr>
-      <td class="addr">${entry.addr}</td>
+      <td class="addr">${toHex(entry.addr)}</td>
       ${this.renderCodeLength(entry)}
       ${this.renderLabel(entry.label)}
       <td class="desc">
@@ -366,10 +366,11 @@ export class MapTable extends LitElement {
   }
 
   private renderStructVar(entry: GameRelVar) {
+    // structs can have tags, but they're left out to save space
     return html`<tr>
-      <td class="offset">${entry.offset}</td>
+      <td class="offset">${toHex(entry.offset)}</td>
       ${this.renderVarLength(entry)}
-      ${this.renderType(entry.type)}
+      ${this.renderType(entry.typeStr())}
       ${this.renderLabel(entry.label)}
       ${this.renderDesc(entry)}
       ${this.renderNotes(entry.notes)}
@@ -379,7 +380,7 @@ export class MapTable extends LitElement {
   private renderStructEntry(entry: GameStruct, parentAddr: number) {
     return html`<map-table
       .tableType="${TableType.StructDef}"
-      .data="${entry.vars}"
+      .entries="${entry.vars}"
       .structs="${this.structs}"
       .enums="${this.enums}"
       .parentAddr="${parentAddr}"
@@ -389,7 +390,7 @@ export class MapTable extends LitElement {
 
   private renderEnumVal(entry: GameEnumVal) {
     return html`<tr>
-      <td class="val">${entry.val}</td>
+      <td class="val">${toHex(entry.val)}</td>
       ${this.renderLabel(entry.label)}
       <td class="desc">${entry.desc}</td>
       ${this.renderNotes(entry.notes)}
@@ -399,34 +400,30 @@ export class MapTable extends LitElement {
   private renderEnumEntry(entry: GameEnumVal[]) {
     return html`<map-table
       .tableType="${TableType.EnumDef}"
-      .data="${entry}"
+      .entries="${entry}"
       .structs="${this.structs}"
       .enums="${this.enums}"
       .hiddenColumns="${this.hiddenColumns}">
     </map-table>`
   }
 
-  private renderRow(item: unknown) {
+  private renderRow(item: GameEntry) {
     switch (this.tableType) {
       case TableType.RamList:
       case TableType.DataList:
-        const tgav = Object.create(GameAbsVar.prototype);
-        const gav = Object.assign(tgav, item);
-        return this.renderAbsVarEntry(gav);
+        const gav = item as GameDataVar;
+        return this.renderDataVarEntry(gav);
       case TableType.CodeList:
-        const tgc = Object.create(GameCode.prototype);
-        const gc = Object.assign(tgc, item);
+        const gc = item as GameCode;
         return this.renderCodeEntry(gc);
       case TableType.StructDef:
-        const tgrv = Object.create(GameRelVar.prototype);
-        const grv = Object.assign(tgrv, item);
+        const grv = item as GameRelVar;
         return this.renderStructVar(grv);
       case TableType.EnumDef:
-        const tge = Object.create(GameEnumVal.prototype);
-        const ge = Object.assign(tge, item);
-        return this.renderEnumVal(ge);
+        const gel = item as GameEnumVal;
+        return this.renderEnumVal(gel);
       default:
-        throw new Error("Invalid TableType");
+        throw new Error('Invalid TableType');
     }
   }
 
@@ -437,7 +434,7 @@ export class MapTable extends LitElement {
           ${this.getHeadings().map(heading => html`
             <th>${heading}</th>`)}
         </tr>
-        ${this.data.map((item: unknown) => {
+        ${this.entries.map((item: GameEntry) => {
           return this.renderRow(item);
         })}
       </table>

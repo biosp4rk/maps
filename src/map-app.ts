@@ -1,9 +1,11 @@
 import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import { TableType } from './map-table';
-import { GameAbsVar, GameCode, GameStructList, GameEnumList, GameStruct } from './entry-types';
 import {
-  KEY_LABEL, KEY_ADDR, KEY_TAGS, KEY_TYPE, KEY_ENUM, KEY_DESC, KEY_NOTES, getHideableColumns
+  GameAbsVar, GameDataVar, GameCode, GameStructList, GameEnumList, GameStruct, GameEnum, DictEntry
+} from './entry-types';
+import {
+  KEY_LABEL, KEY_NOTES, KEY_TAGS, getHideableColumns
 } from './headings'
 import { FilterItem, FilterParser, SearchType } from './filter-parser';
 
@@ -12,7 +14,7 @@ const URL_MAP = 'map';
 const URL_REGION = 'region';
 const URL_FILTER = 'filter';
 
-const REGIONS = ['U', 'E', 'J'];
+const REGIONS = ['U', 'E', 'J', 'C'];
 
 const GAMES = [
   {
@@ -168,9 +170,9 @@ export class MapApp extends LitElement {
   /** game enum definitions */
   @property({ type: Object }) enums: GameEnumList = {};
   /** all map data for game and region */
-  @property({ type: Array }) allData: Array<{ [key: string]: unknown }> = [];
+  @property({ type: Array }) allData: GameAbsVar[] = [];
   /** filtered map data to display */
-  @property({ type: Array }) filterData: Array<{ [key: string]: unknown }> = [];
+  @property({ type: Array }) filterData: GameAbsVar[] = [];
   /** mf or zm */
   @property({ type: String }) game = GAMES[0].value;
   /** U, E, or J */
@@ -242,15 +244,21 @@ export class MapApp extends LitElement {
         entry.addr = addrs[this.region]
       } else {
         entry.addr = null;
+        return;
       }
     }
+    // data may have different counts
+    if (typeof entry.count == 'object') {
+      const counts = entry.count as { [key: string]: string };
+      if (this.region in counts) {
+        entry.count = counts[this.region]
+      }
+    }    
     // functions may have different sizes
     if (typeof entry.size == 'object') {
       const sizes = entry.size as { [key: string]: string };
       if (this.region in sizes) {
         entry.size = sizes[this.region]
-      } else {
-        entry.addr = null;
       }
     }
   }
@@ -272,7 +280,7 @@ export class MapApp extends LitElement {
     let enms = await fetch(targetBaseUrl + 'enums.json')
       .then(response => response.json());
     for (const key in enms) {
-      enms[key] = Object.assign([], enms[key]);
+      enms[key] = new GameEnum(enms[key])
     }
     this.enums = enms as GameEnumList;
 
@@ -280,16 +288,25 @@ export class MapApp extends LitElement {
     let strcts = await fetch(targetBaseUrl + 'structs.json')
       .then(response => response.json());
     for (const key in strcts) {
-      strcts[key] = Object.assign(new GameStruct(), strcts[key]);
+      strcts[key] = new GameStruct(strcts[key]);
     }
     this.structs = strcts as GameStructList;
 
     // get map data
-    let fullData: Array<{ [key: string]: unknown }> = await fetch(targetBaseUrl + `${this.map}.json`)
+    let fullData: DictEntry[] = await fetch(targetBaseUrl + `${this.map}.json`)
       .then(response => response.json());
     // filter data by region
     fullData.forEach(entry => this.getRegionEntry(entry));
-    this.allData = fullData.filter(entry => entry.addr !== null);
+    fullData = fullData.filter(entry => entry.addr !== null);
+    // convert to classes
+    this.allData = fullData.map(entry => {
+      if (this.map === MAP_CODE) {
+        return new GameCode(entry);
+      } else {
+        return new GameDataVar(entry);
+      }
+    });
+
     this.filterData = this.allData;
     // check if loading page with filter
     if ((first || keepFilter) && this.filter) {
@@ -328,7 +345,7 @@ export class MapApp extends LitElement {
   private checkDescFilter(
     desc: string,
     item: FilterItem,
-    type: string = '',
+    structName: string = '',
     enm: string = ''
   ): boolean {
     // get description and its terms for searching
@@ -349,15 +366,15 @@ export class MapApp extends LitElement {
       }
     }
     // check if entry is struct
-    if (type && type in this.structs) {
-      const es = this.structs[type];
-      if (es.vars.some(rv => this.checkDescFilter(rv.desc, item, rv.type, rv.enum))) {
+    if (structName && structName in this.structs) {
+      const es = this.structs[structName];
+      if (es.vars.some(rv => this.checkDescFilter(rv.desc, item, rv.structName, rv.enum))) {
         return true;
       }
     }
     // check if entry has enum
     if (enm && enm in this.enums) {
-      const ee = this.enums[enm];
+      const ee = this.enums[enm].vals;
       if (ee.some(ev => this.checkDescFilter(ev.desc, item))) {
         return true;
       }
@@ -401,10 +418,7 @@ export class MapApp extends LitElement {
     const target = item.addr!
     // find index of first entry past address
     // TODO: binary search
-    let idx = this.filterData.findIndex(entry => {
-      const addr = parseInt(entry[KEY_ADDR] as string, 16)
-      return addr > target;
-    });
+    let idx = this.filterData.findIndex(entry => entry.addr > target);
     let exact = false;
     if (idx === -1) {
       idx = this.filterData.length;
@@ -416,14 +430,12 @@ export class MapApp extends LitElement {
       const tableType = this.getTableType();
       const entry = this.filterData[idx - 1];
       if (tableType === TableType.CodeList) {
-        const tgc = Object.create(GameCode.prototype);
-        const gc = Object.assign(tgc, entry);
-        addr = parseInt(gc.addr, 16);
-        size = parseInt(gc.size, 16);
+        const gc = entry as GameCode;
+        addr = gc.addr
+        size = gc.size;
       } else {
-        const tgc = Object.create(GameAbsVar.prototype);
-        const gav = Object.assign(tgc, entry);
-        addr = parseInt(gav.addr, 16);
+        const gav = entry as GameDataVar;
+        addr = gav.addr;
         size = gav.getLength(this.structs);
       }
       if (target >= addr && target < addr + size) {
@@ -457,10 +469,23 @@ export class MapApp extends LitElement {
         case SearchType.Quote:
         case SearchType.Regex:
           this.filterData = this.filterData.filter(entry => {
-            const desc = entry[KEY_DESC] as string;
-            const type = checkStruct ? entry[KEY_TYPE] as string : '';
-            const enm = checkEnum ? entry[KEY_ENUM] as string : '';
-            return this.checkDescFilter(desc, item, type, enm);
+            let desc;
+            let sname = undefined;
+            let enm = undefined;
+            if (this.map == MAP_CODE) {
+              const gc = entry as GameCode;
+              desc = gc.desc;
+            } else {
+              const gav = entry as GameDataVar;
+              desc = gav.desc;
+              if (checkStruct) {
+                sname = gav.structName;
+              }
+              if (checkEnum) {
+                enm = gav.enum;
+              }
+            }
+            return this.checkDescFilter(desc, item, sname, enm);
           });
           break;
         case SearchType.AddrEQ:
@@ -469,8 +494,7 @@ export class MapApp extends LitElement {
         case SearchType.AddrGE:
         case SearchType.AddrLE:
           this.filterData = this.filterData.filter(entry => {
-            const addr = parseInt(entry[KEY_ADDR] as string, 16);
-            return this.checkAddrFilter(addr, item);
+            return this.checkAddrFilter(entry.addr, item);
           });
           break;
         case SearchType.AddrNear:
@@ -605,7 +629,7 @@ export class MapApp extends LitElement {
     const lastRow = firstRow + this.pageSize;
     return html`<map-table
       .tableType="${this.getTableType()}"
-      .data="${this.filterData.slice(firstRow, lastRow)}"
+      .entries="${this.filterData.slice(firstRow, lastRow)}"
       .structs="${this.structs}"
       .enums="${this.enums}"
       .hiddenColumns="${this.hiddenColumns}">

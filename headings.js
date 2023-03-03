@@ -1,37 +1,40 @@
 export const KEY_ADDR = 'addr';
-export const KEY_LEN = 'length';
-export const KEY_TAGS = 'tags';
-export const KEY_TYPE = 'type';
+export const KEY_COUNT = 'count';
+export const KEY_DESC = 'desc';
 export const KEY_ENUM = 'enum';
 export const KEY_LABEL = 'label';
-export const KEY_DESC = 'desc';
-export const KEY_ARGS = 'params';
-export const KEY_RET = 'returns';
-export const KEY_OFF = 'offset';
-export const KEY_VAL = 'value';
+export const KEY_LEN = 'length';
+export const KEY_MODE = 'mode';
 export const KEY_NOTES = 'notes';
+export const KEY_OFF = 'offset';
+export const KEY_PARAMS = 'params';
+export const KEY_RET = 'returns';
+export const KEY_SIZE = 'size';
+export const KEY_TAGS = 'tags';
+export const KEY_TYPE = 'type';
+export const KEY_VAL = 'val';
 const HEAD_ADDR = 'Address';
+const HEAD_DESC = 'Description';
+const HEAD_LABEL = 'Label';
 const HEAD_LEN = 'Length';
+const HEAD_NOTES = 'Notes';
+const HEAD_OFF = 'Offset';
+const HEAD_PARAMS = 'Arguments';
+const HEAD_RET = 'Returns';
 const HEAD_TAGS = 'Category';
 const HEAD_TYPE = 'Type';
-const HEAD_LABEL = 'Label';
-const HEAD_DESC = 'Description';
-const HEAD_ARGS = 'Arguments';
-const HEAD_RET = 'Returns';
-const HEAD_OFF = 'Offset';
 const HEAD_VAL = 'Value';
-const HEAD_NOTES = 'Notes';
 const HEADINGS = {
     [KEY_ADDR]: HEAD_ADDR,
+    [KEY_DESC]: HEAD_DESC,
+    [KEY_LABEL]: HEAD_LABEL,
     [KEY_LEN]: HEAD_LEN,
+    [KEY_NOTES]: HEAD_NOTES,
+    [KEY_OFF]: HEAD_OFF,
+    [KEY_PARAMS]: HEAD_PARAMS,
+    [KEY_RET]: HEAD_RET,
     [KEY_TAGS]: HEAD_TAGS,
     [KEY_TYPE]: HEAD_TYPE,
-    [KEY_LABEL]: HEAD_LABEL,
-    [KEY_DESC]: HEAD_DESC,
-    [KEY_NOTES]: HEAD_NOTES,
-    [KEY_ARGS]: HEAD_ARGS,
-    [KEY_RET]: HEAD_RET,
-    [KEY_OFF]: HEAD_OFF,
     [KEY_VAL]: HEAD_VAL
 };
 export const CATEGORIES = {
@@ -43,11 +46,13 @@ export const CATEGORIES = {
     'gfx': 'Graphics',
     'tilemap': 'Tilemap',
     'palette': 'Palette',
-    'oamframe': 'OAM frame',
+    'oam_frame': 'OAM frame',
+    'bg_blocks': 'BG block map',
+    'bg_map': 'BG tilemap',
     'thumb': 'THUMB',
     'arm': 'ARM',
 };
-export const SEARCHABLE_KEYS = [KEY_DESC, KEY_ADDR, KEY_ARGS, KEY_RET];
+export const SEARCHABLE_KEYS = [KEY_DESC, KEY_ADDR, KEY_PARAMS, KEY_RET];
 export function getHeading(key) {
     return HEADINGS[key];
 }
@@ -87,8 +92,8 @@ export function getHideableColumns(map) {
                 key: KEY_LABEL
             },
             {
-                head: HEAD_ARGS,
-                key: KEY_ARGS
+                head: HEAD_PARAMS,
+                key: KEY_PARAMS
             },
             {
                 head: HEAD_RET,
