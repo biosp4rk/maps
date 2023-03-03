@@ -1,5 +1,5 @@
 export {
-  GameEntry, GameVar, GameRelVar, GameAbsVar, GameDataVar, GameCode,
+  GameEntry, GameVar, GameRelVar, GameData, GameCode,
   GameStruct, GameEnumVal, GameEnum, GameStructList, GameEnumList
 };
 import { toHex } from "./utils";
@@ -87,7 +87,9 @@ const MODE_TO_STR = {
 const STR_TO_MODE = swap_key_value(MODE_TO_STR);
 
 abstract class GameEntry {
-
+  sortValue(): number {
+    throw new Error('Unsupported');
+  }
 }
 
 class GameVar extends GameEntry {
@@ -232,6 +234,7 @@ class GameVar extends GameEntry {
   }
 }
 
+/** Represents struct var entries */
 class GameRelVar extends GameVar {
   offset!: number;
 
@@ -240,27 +243,31 @@ class GameRelVar extends GameVar {
     this.offset = parseInt(entry[KEY_OFF] as string)
   }
 
+  override sortValue(): number {
+    return this.offset;
+  }
+
   /** Returns the address of this field in item 0 */
   getOffsetToolTip(parentAddr: number): string {
     return 'Address: ' + toHex(parentAddr + this.offset);
   }
 }
 
-interface GameAbsVar {
-  addr: number;
-
-}
-
-class GameDataVar extends GameVar implements GameAbsVar {
+//** Represents ram and data entries */
+class GameData extends GameVar {
   addr!: number;
 
   constructor(entry: DictEntry) {
     super(entry);
     this.addr = parseInt(entry[KEY_ADDR] as string)
   }
+
+  override sortValue(): number {
+    return this.addr;
+  }
 }
 
-class GameCode extends GameEntry implements GameAbsVar {
+class GameCode extends GameEntry {
   desc!: string;
   label!: string;
   addr!: number;
@@ -282,6 +289,10 @@ class GameCode extends GameEntry implements GameAbsVar {
     const ret = entry[KEY_RET] as DictEntry;
     this.return = ret ? new GameVar(ret) : undefined;
     this.notes = entry[KEY_NOTES] as string;
+  }
+
+  override sortValue(): number {
+    return this.addr;
   }
 
   /** Returns where the function ends */
@@ -311,6 +322,10 @@ class GameEnumVal extends GameEntry {
     this.label = entry[KEY_LABEL] as string;
     this.val = parseInt(entry[KEY_VAL] as string);
     this.notes = entry[KEY_NOTES] as string;
+  }
+
+  override sortValue(): number {
+    return this.val;
   }
 }
 

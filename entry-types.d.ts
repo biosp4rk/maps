@@ -1,4 +1,4 @@
-export { GameEntry, GameVar, GameRelVar, GameAbsVar, GameDataVar, GameCode, GameStruct, GameEnumVal, GameEnum, GameStructList, GameEnumList };
+export { GameEntry, GameVar, GameRelVar, GameData, GameCode, GameStruct, GameEnumVal, GameEnum, GameStructList, GameEnumList };
 export declare type DictEntry = {
     [key: string]: unknown;
 };
@@ -29,6 +29,7 @@ declare enum DataTag {
     Arm = 12
 }
 declare abstract class GameEntry {
+    sortValue(): number;
 }
 declare class GameVar extends GameEntry {
     desc: string;
@@ -55,20 +56,20 @@ declare class GameVar extends GameEntry {
     typeStr(): string;
     private parseType;
 }
+/** Represents struct var entries */
 declare class GameRelVar extends GameVar {
     offset: number;
     constructor(entry: DictEntry);
+    sortValue(): number;
     /** Returns the address of this field in item 0 */
     getOffsetToolTip(parentAddr: number): string;
 }
-interface GameAbsVar {
-    addr: number;
-}
-declare class GameDataVar extends GameVar implements GameAbsVar {
+declare class GameData extends GameVar {
     addr: number;
     constructor(entry: DictEntry);
+    sortValue(): number;
 }
-declare class GameCode extends GameEntry implements GameAbsVar {
+declare class GameCode extends GameEntry {
     desc: string;
     label: string;
     addr: number;
@@ -78,6 +79,7 @@ declare class GameCode extends GameEntry implements GameAbsVar {
     return?: GameVar;
     notes?: string;
     constructor(entry: DictEntry);
+    sortValue(): number;
     /** Returns where the function ends */
     getToolTip(): string;
     getParams(): string;
@@ -89,6 +91,7 @@ declare class GameEnumVal extends GameEntry {
     val: number;
     notes?: string;
     constructor(entry: DictEntry);
+    sortValue(): number;
 }
 declare class GameEnum extends GameEntry {
     vals: GameEnumVal[];

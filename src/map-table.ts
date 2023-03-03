@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import {
-  GameEntry, GameVar, GameDataVar, GameRelVar, GameStructList,
+  GameEntry, GameVar, GameData, GameRelVar, GameStructList,
   GameEnumList, GameCode, GameEnumVal, GameStruct
 } from './entry-types';
 import { toHex } from './utils';
@@ -241,7 +241,7 @@ export class MapTable extends LitElement {
     } else if (entry.spec() in this.structs) {
       const gs = this.structs[entry.spec()];
       const pa = this.parentAddr ?
-        this.parentAddr : (entry as GameDataVar).addr;
+        this.parentAddr : (entry as GameData).addr;
       return this.renderStructEntry(gs, pa);
     }
     return '';
@@ -279,7 +279,7 @@ export class MapTable extends LitElement {
     return html`<td class="notes">${notes}</td>`
   }
 
-  private renderDataVarEntry(entry: GameDataVar) {
+  private renderDataVarEntry(entry: GameData) {
     return html`<tr>
       <td class="addr">${toHex(entry.addr)}</td>
       ${this.renderVarLength(entry)}
@@ -295,11 +295,10 @@ export class MapTable extends LitElement {
     if (this.hiddenColumns.has(KEY_LEN)) {
       return '';
     }
-    const len = toHex(entry.size);
     const toolTip = entry.getToolTip();
     return html`<td>
       <div class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
-        title="${toolTip}">${len}</div>
+        title="${toolTip}">${toHex(entry.size)}</div>
     </td>`;
   }
 
@@ -366,9 +365,12 @@ export class MapTable extends LitElement {
   }
 
   private renderStructVar(entry: GameRelVar) {
+    const toolTip = entry.getOffsetToolTip(this.parentAddr);
     // structs can have tags, but they're left out to save space
     return html`<tr>
-      <td class="offset">${toHex(entry.offset)}</td>
+      <td class="offset has-tooltip" title="${toolTip}">
+        ${toHex(entry.offset)}
+      </td>
       ${this.renderVarLength(entry)}
       ${this.renderType(entry.typeStr())}
       ${this.renderLabel(entry.label)}
@@ -411,7 +413,7 @@ export class MapTable extends LitElement {
     switch (this.tableType) {
       case TableType.RamList:
       case TableType.DataList:
-        const gav = item as GameDataVar;
+        const gav = item as GameData;
         return this.renderDataVarEntry(gav);
       case TableType.CodeList:
         const gc = item as GameCode;

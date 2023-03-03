@@ -1,4 +1,4 @@
-export { GameEntry, GameVar, GameRelVar, GameDataVar, GameCode, GameStruct, GameEnumVal, GameEnum };
+export { GameEntry, GameVar, GameRelVar, GameData, GameCode, GameStruct, GameEnumVal, GameEnum };
 import { toHex } from "./utils";
 import { KEY_ADDR, KEY_COUNT, KEY_DESC, KEY_ENUM, KEY_LABEL, KEY_MODE, KEY_NOTES, KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL } from "./headings";
 function swap_key_value(obj) {
@@ -71,6 +71,9 @@ const MODE_TO_STR = {
 };
 const STR_TO_MODE = swap_key_value(MODE_TO_STR);
 class GameEntry {
+    sortValue() {
+        throw new Error('Unsupported');
+    }
 }
 class GameVar extends GameEntry {
     constructor(entry) {
@@ -199,20 +202,28 @@ class GameVar extends GameEntry {
         }
     }
 }
+/** Represents struct var entries */
 class GameRelVar extends GameVar {
     constructor(entry) {
         super(entry);
         this.offset = parseInt(entry[KEY_OFF]);
+    }
+    sortValue() {
+        return this.offset;
     }
     /** Returns the address of this field in item 0 */
     getOffsetToolTip(parentAddr) {
         return 'Address: ' + toHex(parentAddr + this.offset);
     }
 }
-class GameDataVar extends GameVar {
+//** Represents ram and data entries */
+class GameData extends GameVar {
     constructor(entry) {
         super(entry);
         this.addr = parseInt(entry[KEY_ADDR]);
+    }
+    sortValue() {
+        return this.addr;
     }
 }
 class GameCode extends GameEntry {
@@ -228,6 +239,9 @@ class GameCode extends GameEntry {
         const ret = entry[KEY_RET];
         this.return = ret ? new GameVar(ret) : undefined;
         this.notes = entry[KEY_NOTES];
+    }
+    sortValue() {
+        return this.addr;
     }
     /** Returns where the function ends */
     getToolTip() {
@@ -248,6 +262,9 @@ class GameEnumVal extends GameEntry {
         this.label = entry[KEY_LABEL];
         this.val = parseInt(entry[KEY_VAL]);
         this.notes = entry[KEY_NOTES];
+    }
+    sortValue() {
+        return this.val;
     }
 }
 class GameEnum extends GameEntry {

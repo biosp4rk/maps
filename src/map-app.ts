@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import { TableType } from './map-table';
 import {
-  GameAbsVar, GameDataVar, GameCode, GameStructList, GameEnumList, GameStruct, GameEnum, DictEntry
+  GameEntry, GameData, GameCode, GameStructList, GameEnumList, GameStruct, GameEnum, DictEntry
 } from './entry-types';
 import {
   KEY_LABEL, KEY_NOTES, KEY_TAGS, getHideableColumns
@@ -170,9 +170,9 @@ export class MapApp extends LitElement {
   /** game enum definitions */
   @property({ type: Object }) enums: GameEnumList = {};
   /** all map data for game and region */
-  @property({ type: Array }) allData: GameAbsVar[] = [];
+  @property({ type: Array }) allData: GameEntry[] = [];
   /** filtered map data to display */
-  @property({ type: Array }) filterData: GameAbsVar[] = [];
+  @property({ type: Array }) filterData: GameEntry[] = [];
   /** mf or zm */
   @property({ type: String }) game = GAMES[0].value;
   /** U, E, or J */
@@ -303,7 +303,7 @@ export class MapApp extends LitElement {
       if (this.map === MAP_CODE) {
         return new GameCode(entry);
       } else {
-        return new GameDataVar(entry);
+        return new GameData(entry);
       }
     });
 
@@ -368,7 +368,9 @@ export class MapApp extends LitElement {
     // check if entry is struct
     if (structName && structName in this.structs) {
       const es = this.structs[structName];
-      if (es.vars.some(rv => this.checkDescFilter(rv.desc, item, rv.structName, rv.enum))) {
+      if (es.vars.some(
+        rv => this.checkDescFilter(rv.desc, item, rv.structName, rv.enum))
+      ) {
         return true;
       }
     }
@@ -418,7 +420,8 @@ export class MapApp extends LitElement {
     const target = item.addr!
     // find index of first entry past address
     // TODO: binary search
-    let idx = this.filterData.findIndex(entry => entry.addr > target);
+    let idx = this.filterData.findIndex(
+      entry => entry.sortValue() > target);
     let exact = false;
     if (idx === -1) {
       idx = this.filterData.length;
@@ -434,9 +437,9 @@ export class MapApp extends LitElement {
         addr = gc.addr
         size = gc.size;
       } else {
-        const gav = entry as GameDataVar;
-        addr = gav.addr;
-        size = gav.getLength(this.structs);
+        const gd = entry as GameData;
+        addr = gd.addr;
+        size = gd.getLength(this.structs);
       }
       if (target >= addr && target < addr + size) {
         exact = true;
@@ -476,13 +479,13 @@ export class MapApp extends LitElement {
               const gc = entry as GameCode;
               desc = gc.desc;
             } else {
-              const gav = entry as GameDataVar;
-              desc = gav.desc;
+              const gd = entry as GameData;
+              desc = gd.desc;
               if (checkStruct) {
-                sname = gav.structName;
+                sname = gd.structName;
               }
               if (checkEnum) {
-                enm = gav.enum;
+                enm = gd.enum;
               }
             }
             return this.checkDescFilter(desc, item, sname, enm);
@@ -494,7 +497,7 @@ export class MapApp extends LitElement {
         case SearchType.AddrGE:
         case SearchType.AddrLE:
           this.filterData = this.filterData.filter(entry => {
-            return this.checkAddrFilter(entry.addr, item);
+            return this.checkAddrFilter(entry.sortValue(), item);
           });
           break;
         case SearchType.AddrNear:
