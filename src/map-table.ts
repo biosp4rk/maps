@@ -413,8 +413,8 @@ export class MapTable extends LitElement {
     switch (this.tableType) {
       case TableType.RamList:
       case TableType.DataList:
-        const gav = item as GameData;
-        return this.renderDataVarEntry(gav);
+        const gd = item as GameData;
+        return this.renderDataVarEntry(gd);
       case TableType.CodeList:
         const gc = item as GameCode;
         return this.renderCodeEntry(gc);
