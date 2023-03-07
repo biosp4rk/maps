@@ -1,6 +1,6 @@
 export {
   GameEntry, GameVar, GameRelVar, GameData, GameCode,
-  GameStruct, GameEnumVal, GameEnum, GameStructList, GameEnumList
+  GameStruct, GameEnumVal, GameEnum, GameStructDict, GameEnumDict
 };
 import { toHex } from "./utils";
 import {
@@ -121,7 +121,7 @@ class GameVar extends GameEntry {
     return this.arrCount ?? 1;
   }
 
-  getSpecSize(structs: GameStructList) : number {
+  getSpecSize(structs: GameStructDict) : number {
     switch (+this.primitive) {
       case PrimType.U8:
       case PrimType.S8:
@@ -145,7 +145,7 @@ class GameVar extends GameEntry {
   }
 
   /** Gets the physical size of an individual item */
-  getSize(structs: GameStructList): number {
+  getSize(structs: GameStructDict): number {
     let size = this.getSpecSize(structs);
     if (!this.declaration) {
       return size;
@@ -174,12 +174,12 @@ class GameVar extends GameEntry {
   }
 
   /** Gets the total physical size of all items */
-  getLength(structs: GameStructList): number {
+  getLength(structs: GameStructDict): number {
     return this.getCount() * this.getSize(structs);
   }
 
   /** Returns the item size and count if count > 1 */
-  getLengthToolTip(structs: GameStructList): string {
+  getLengthToolTip(structs: GameStructDict): string {
     const count = this.getCount();
     if (count == 1) {
       return '';
@@ -330,6 +330,7 @@ class GameEnumVal extends GameEntry {
 }
 
 class GameEnum extends GameEntry {
+  label?: string; // not provided in constructor
   vals!: GameEnumVal[];
 
   constructor(entry: DictEntry) {
@@ -339,6 +340,7 @@ class GameEnum extends GameEntry {
 }
 
 class GameStruct extends GameEntry {
+  label?: string; // not provided in constructor
   size!: number;
   vars!: GameRelVar[];
 
@@ -349,5 +351,5 @@ class GameStruct extends GameEntry {
   }
 }
 
-type GameStructList = { [key: string]: GameStruct };
-type GameEnumList = { [key: string]: GameEnum };
+type GameStructDict = { [key: string]: GameStruct };
+type GameEnumDict = { [key: string]: GameEnum };

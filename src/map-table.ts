@@ -1,13 +1,14 @@
 import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import {
-  GameEntry, GameVar, GameData, GameRelVar, GameStructList,
-  GameEnumList, GameCode, GameEnumVal, GameStruct
+  GameEntry, GameVar, GameData, GameRelVar, GameStructDict,
+  GameEnumDict, GameCode, GameEnumVal, GameStruct, GameEnum
 } from './entry-types';
 import { toHex } from './utils';
 import {
-  KEY_ADDR, KEY_DESC, KEY_LABEL, KEY_LEN, KEY_NOTES, KEY_OFF,
-  KEY_PARAMS, KEY_RET, KEY_TAGS, KEY_TYPE, KEY_VAL, CATEGORIES, getHeading
+  KEY_ADDR, KEY_DESC, KEY_LABEL, KEY_LEN, KEY_NOTES, KEY_OFF, KEY_PARAMS,
+  KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL, KEY_VALS, KEY_VARS,
+  CATEGORIES, getHeading
 } from './headings';
 
 export enum TableType {
@@ -15,6 +16,8 @@ export enum TableType {
   RamList,
   CodeList,
   DataList,
+  StructList,
+  EnumList,
   StructDef,
   EnumDef
 }
@@ -136,9 +139,9 @@ export class MapTable extends LitElement {
   /** The JSON data to render */
   @property({ type: Array }) entries: GameEntry[] = [];
   /** All struct definitions in the game */
-  @property({ type: Object }) structs: GameStructList = {};
+  @property({ type: Object }) structs: GameStructDict = {};
   /** All enum definitions in the game */
-  @property({ type: Object }) enums: GameEnumList = {};
+  @property({ type: Object }) enums: GameEnumDict = {};
   /** Address of parent entry if table is part of row */
   @property({ type: Number }) parentAddr = NaN;
   /** Columns that should not be displayed */
@@ -170,6 +173,10 @@ export class MapTable extends LitElement {
         return [KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.CodeList:
         return [KEY_ADDR, KEY_LEN, KEY_LABEL, KEY_DESC, KEY_PARAMS, KEY_RET, KEY_NOTES];
+      case TableType.StructList:
+        return [KEY_LABEL, KEY_SIZE, KEY_VARS];
+      case TableType.EnumList:
+        return [KEY_LABEL, KEY_VALS];
       case TableType.StructDef:
         return [KEY_OFF, KEY_LEN, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.EnumDef:
@@ -187,9 +194,16 @@ export class MapTable extends LitElement {
   }
 
   private isMainTable(): boolean {
-    return this.tableType === TableType.RamList ||
-      this.tableType === TableType.CodeList ||
-      this.tableType === TableType.DataList;
+    switch (this.tableType) {
+      case TableType.RamList:
+      case TableType.CodeList:
+      case TableType.DataList:
+      case TableType.StructList:
+      case TableType.EnumList:
+        return true;
+      default:
+        return false;
+    }
   }
 
   private expand(event: any) {
@@ -237,12 +251,12 @@ export class MapTable extends LitElement {
   private renderSubTable(entry: GameVar) {
     if (Boolean(entry.enum) && entry.enum! in this.enums) {
       const vals: GameEnumVal[] = this.enums[entry.enum!].vals;
-      return this.renderEnumEntry(vals);
+      return this.renderEnumDef(vals);
     } else if (entry.spec() in this.structs) {
       const gs = this.structs[entry.spec()];
       const pa = this.parentAddr ?
         this.parentAddr : (entry as GameData).addr;
-      return this.renderStructEntry(gs, pa);
+      return this.renderStructDef(gs, pa);
     }
     return '';
   }
@@ -364,6 +378,19 @@ export class MapTable extends LitElement {
     </tr>`;
   }
 
+  private renderStructEntry(entry: GameStruct) {
+    return html`<tr>
+      ${this.renderLabel(entry.label!)}
+      <td class="size">${toHex(entry.size)}</td>
+    </tr>`;
+  }
+
+  private renderEnumEntry(entry: GameEnum) {
+    return html`<tr>
+      ${this.renderLabel(entry.label!)}
+    </tr>`;
+  }
+
   private renderStructVar(entry: GameRelVar) {
     const toolTip = entry.getOffsetToolTip(this.parentAddr);
     // structs can have tags, but they're left out to save space
@@ -379,7 +406,7 @@ export class MapTable extends LitElement {
     </tr>`;
   }
 
-  private renderStructEntry(entry: GameStruct, parentAddr: number) {
+  private renderStructDef(entry: GameStruct, parentAddr: number) {
     return html`<map-table
       .tableType="${TableType.StructDef}"
       .entries="${entry.vars}"
@@ -399,7 +426,7 @@ export class MapTable extends LitElement {
     </tr>`;
   }
 
-  private renderEnumEntry(entry: GameEnumVal[]) {
+  private renderEnumDef(entry: GameEnumVal[]) {
     return html`<map-table
       .tableType="${TableType.EnumDef}"
       .entries="${entry}"
@@ -418,6 +445,12 @@ export class MapTable extends LitElement {
       case TableType.CodeList:
         const gc = item as GameCode;
         return this.renderCodeEntry(gc);
+      case TableType.StructList:
+        const gs = item as GameStruct;
+        return this.renderStructEntry(gs);
+      case TableType.EnumList:
+        const ge = item as GameEnum;
+        return this.renderEnumEntry(ge);
       case TableType.StructDef:
         const grv = item as GameRelVar;
         return this.renderStructVar(grv);

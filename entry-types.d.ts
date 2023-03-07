@@ -1,4 +1,4 @@
-export { GameEntry, GameVar, GameRelVar, GameData, GameCode, GameStruct, GameEnumVal, GameEnum, GameStructList, GameEnumList };
+export { GameEntry, GameVar, GameRelVar, GameData, GameCode, GameStruct, GameEnumVal, GameEnum, GameStructDict, GameEnumDict };
 export declare type DictEntry = {
     [key: string]: unknown;
 };
@@ -44,13 +44,13 @@ declare class GameVar extends GameEntry {
     constructor(entry: DictEntry);
     /** Gets the number of items (1 unless array type) */
     getCount(): number;
-    getSpecSize(structs: GameStructList): number;
+    getSpecSize(structs: GameStructDict): number;
     /** Gets the physical size of an individual item */
-    getSize(structs: GameStructList): number;
+    getSize(structs: GameStructDict): number;
     /** Gets the total physical size of all items */
-    getLength(structs: GameStructList): number;
+    getLength(structs: GameStructDict): number;
     /** Returns the item size and count if count > 1 */
-    getLengthToolTip(structs: GameStructList): string;
+    getLengthToolTip(structs: GameStructDict): string;
     spec(): string;
     tagStrs(): string[] | undefined;
     typeStr(): string;
@@ -94,18 +94,20 @@ declare class GameEnumVal extends GameEntry {
     sortValue(): number;
 }
 declare class GameEnum extends GameEntry {
+    label?: string;
     vals: GameEnumVal[];
     constructor(entry: DictEntry);
 }
 declare class GameStruct extends GameEntry {
+    label?: string;
     size: number;
     vars: GameRelVar[];
     constructor(entry: DictEntry);
 }
-declare type GameStructList = {
+declare type GameStructDict = {
     [key: string]: GameStruct;
 };
-declare type GameEnumList = {
+declare type GameEnumDict = {
     [key: string]: GameEnum;
 };
 //# sourceMappingURL=entry-types.d.ts.map

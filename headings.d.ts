@@ -13,10 +13,11 @@ export declare const KEY_SIZE = "size";
 export declare const KEY_TAGS = "tags";
 export declare const KEY_TYPE = "type";
 export declare const KEY_VAL = "val";
+export declare const KEY_VALS = "vals";
+export declare const KEY_VARS = "vars";
 export declare const CATEGORIES: {
     [key: string]: string;
 };
-export declare const SEARCHABLE_KEYS: string[];
 export declare function getHeading(key: string): string;
 export declare function getHideableColumns(map: string): {
     head: string;

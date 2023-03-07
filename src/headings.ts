@@ -14,6 +14,8 @@ export const KEY_SIZE = 'size';
 export const KEY_TAGS = 'tags';
 export const KEY_TYPE = 'type';
 export const KEY_VAL = 'val';
+export const KEY_VALS = 'vals';
+export const KEY_VARS = 'vars';
 
 const HEAD_ADDR = 'Address';
 const HEAD_DESC = 'Description';
@@ -23,9 +25,12 @@ const HEAD_NOTES = 'Notes';
 const HEAD_OFF = 'Offset';
 const HEAD_PARAMS = 'Arguments';
 const HEAD_RET = 'Returns';
+const HEAD_SIZE = 'Size';
 const HEAD_TAGS = 'Category';
 const HEAD_TYPE = 'Type';
 const HEAD_VAL = 'Value';
+const HEAD_VALS = 'Values';
+const HEAD_VARS = 'Variables';
 
 const HEADINGS: { [key: string]: string } = {
   [KEY_ADDR]: HEAD_ADDR,
@@ -36,9 +41,12 @@ const HEADINGS: { [key: string]: string } = {
   [KEY_OFF]: HEAD_OFF,
   [KEY_PARAMS]: HEAD_PARAMS,
   [KEY_RET]: HEAD_RET,
+  [KEY_SIZE]: HEAD_SIZE,
   [KEY_TAGS]: HEAD_TAGS,
   [KEY_TYPE]: HEAD_TYPE,
-  [KEY_VAL]: HEAD_VAL
+  [KEY_VAL]: HEAD_VAL,
+  [KEY_VALS]: HEAD_VALS,
+  [KEY_VARS]: HEAD_VARS
 };
 
 export const CATEGORIES: { [key: string]: string } = {
@@ -57,12 +65,11 @@ export const CATEGORIES: { [key: string]: string } = {
   'arm': 'ARM',
 };
 
-export const SEARCHABLE_KEYS = [KEY_DESC, KEY_ADDR, KEY_PARAMS, KEY_RET];
-
 export function getHeading(key: string): string {
   return HEADINGS[key];
 }
 
+// TODO: use constants for map
 export function getHideableColumns(map: string): { head: string; key: string; }[] {
   if (map === 'ram' || map === 'data') {
     return [
@@ -87,8 +94,7 @@ export function getHideableColumns(map: string): { head: string; key: string; }[
         key: KEY_NOTES
       }
     ];
-  }
-  else if (map === 'code') {
+  } else if (map === 'code') {
     return [
       {
         head: HEAD_LEN,
@@ -111,6 +117,16 @@ export function getHideableColumns(map: string): { head: string; key: string; }[
         key: KEY_NOTES
       }
     ];
+  } else if (map === 'structs') {
+    return [
+      {
+        head: HEAD_SIZE,
+        key: KEY_SIZE
+      }
+    ];
+  } else if (map === 'enums') {
+    // enums only have two columns, not much to hide
+    return [];
   }
   return [];
 }
