@@ -9,6 +9,8 @@ import {
 } from './headings'
 import { FilterItem, FilterParser, SearchType } from './filter-parser';
 
+const VER = 1;
+
 const URL_GAME = 'game';
 const URL_MAP = 'map';
 const URL_REGION = 'region';
@@ -263,6 +265,13 @@ export class MapApp extends LitElement {
     }
   }
 
+  private getJsonUrl(jsonName: string): string {
+    const baseUrl = `/json/${this.game}/`;
+    const fileName = jsonName + '.json';
+    const ver = '?v=' + VER;
+    return baseUrl + fileName + ver;
+  }
+
   async fetchData(first: boolean, keepFilter: boolean) {
     if (!this.game || !this.region || !this.map) {
       return;
@@ -274,10 +283,9 @@ export class MapApp extends LitElement {
 
     // read data from json files
     this.fetchingData = true;
-    const targetBaseUrl = `/maps/json/${this.game}/`;
 
     // get enums
-    let enms = await fetch(targetBaseUrl + 'enums.json')
+    let enms = await fetch(this.getJsonUrl('enums'))
       .then(response => response.json());
     for (const key in enms) {
       enms[key] = new GameEnum(enms[key])
@@ -285,7 +293,7 @@ export class MapApp extends LitElement {
     this.enums = enms as GameEnumList;
 
     // get structs
-    let strcts = await fetch(targetBaseUrl + 'structs.json')
+    let strcts = await fetch(this.getJsonUrl('structs'))
       .then(response => response.json());
     for (const key in strcts) {
       strcts[key] = new GameStruct(strcts[key]);
@@ -293,7 +301,7 @@ export class MapApp extends LitElement {
     this.structs = strcts as GameStructList;
 
     // get map data
-    let fullData: DictEntry[] = await fetch(targetBaseUrl + `${this.map}.json`)
+    let fullData: DictEntry[] = await fetch(this.getJsonUrl(this.map))
       .then(response => response.json());
     // filter data by region
     fullData.forEach(entry => this.getRegionEntry(entry));
