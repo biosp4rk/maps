@@ -297,35 +297,29 @@ export class MapApp extends LitElement {
     // get enums
     let enms = await fetch(this.getJsonUrl('enums'))
       .then(response => response.json());
-    for (const key in enms) {
-      enms[key] = new GameEnum(enms[key])
+    for (const entry of enms) {
+      enms[entry[KEY_LABEL]] = new GameEnum(entry)
     }
     this.enums = enms as GameEnumDict;
 
     // get structs
     let strcts = await fetch(this.getJsonUrl('structs'))
       .then(response => response.json());
-    for (const key in strcts) {
-      strcts[key] = new GameStruct(strcts[key]);
+    for (const entry of strcts) {
+      strcts[entry[KEY_LABEL]] = new GameStruct(entry)
     }
     this.structs = strcts as GameStructDict;
 
     // get map data
     if (this.map === MAP_STRUCTS) {
-      this.allData = Object.entries(this.structs).map(([name, entry]) => {
-        entry.label = name;
-        return entry;
-      }).sort((a, b) => {
+      this.allData = Object.values(this.structs).sort((a, b) => {
         if (a < b) { return -1; }
         if (a > b) { return 1; }
         return 0;
       });
     } else if (this.map === MAP_ENUMS) {
       // TODO: reuse struct code
-      this.allData = Object.entries(this.enums).map(([name, entry]) => {
-        entry.label = name;
-        return entry;
-      }).sort((a, b) => {
+      this.allData = Object.values(this.enums).sort((a, b) => {
         if (a < b) { return -1; }
         if (a > b) { return 1; }
         return 0;

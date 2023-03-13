@@ -116,14 +116,30 @@ export function getHideableColumns(map) {
     else if (map === 'structs') {
         return [
             {
+                head: HEAD_LABEL,
+                key: KEY_LABEL
+            },
+            {
                 head: HEAD_SIZE,
                 key: KEY_SIZE
+            },
+            {
+                head: HEAD_NOTES,
+                key: KEY_NOTES
             }
         ];
     }
     else if (map === 'enums') {
-        // enums only have two columns, not much to hide
-        return [];
+        return [
+            {
+                head: HEAD_LABEL,
+                key: KEY_LABEL
+            },
+            {
+                head: HEAD_NOTES,
+                key: KEY_NOTES
+            }
+        ];
     }
     return [];
 }

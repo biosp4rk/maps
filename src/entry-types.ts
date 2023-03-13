@@ -87,33 +87,37 @@ const MODE_TO_STR = {
 const STR_TO_MODE = swap_key_value(MODE_TO_STR);
 
 abstract class GameEntry {
+  desc!: string;
+  label!: string;
+  notes?: string;
+
+  constructor(entry: DictEntry) {
+    this.desc = entry[KEY_DESC] as string;
+    this.label = entry[KEY_LABEL] as string;
+    this.notes = entry[KEY_NOTES] as string;
+  }
+
   sortValue(): number {
     throw new Error('Unsupported');
   }
 }
 
 class GameVar extends GameEntry {
-  desc!: string;
-  label!: string;
   arrCount?: number;
   tags?: DataTag[];
   enum?: string;
-  notes?: string;
   // used for type
   primitive!: PrimType;
   structName?: string;
   declaration?: string;
 
   constructor(entry: DictEntry) {
-    super();
-    this.desc = entry[KEY_DESC] as string;
-    this.label = entry[KEY_LABEL] as string;
+    super(entry);
     this.parseType(entry[KEY_TYPE] as string);
     const arrCount = entry[KEY_COUNT] as string;
     this.arrCount = arrCount ? parseInt(arrCount) : undefined;
     this.tags = (entry[KEY_TAGS] as string[])?.map((t: string) => STR_TO_TAG[t]);
     this.enum = entry[KEY_ENUM] as string;
-    this.notes = entry[KEY_NOTES] as string;
   }
 
   /** Gets the number of items (1 unless array type) */
@@ -268,19 +272,14 @@ class GameData extends GameVar {
 }
 
 class GameCode extends GameEntry {
-  desc!: string;
-  label!: string;
   addr!: number;
   size!: number;
   mode!: string;
   params?: GameVar[];
   return?: GameVar;
-  notes?: string;
 
   constructor(entry: DictEntry) {
-    super();
-    this.desc = entry[KEY_DESC] as string;
-    this.label = entry[KEY_LABEL] as string;
+    super(entry);
     this.addr = parseInt(entry[KEY_ADDR] as string);
     this.size = parseInt(entry[KEY_SIZE] as string);
     this.mode = STR_TO_MODE[entry[KEY_MODE] as string];
@@ -288,7 +287,6 @@ class GameCode extends GameEntry {
     this.params = params?.map(p => new GameVar(p));
     const ret = entry[KEY_RET] as DictEntry;
     this.return = ret ? new GameVar(ret) : undefined;
-    this.notes = entry[KEY_NOTES] as string;
   }
 
   override sortValue(): number {
@@ -311,17 +309,11 @@ class GameCode extends GameEntry {
 }
 
 class GameEnumVal extends GameEntry {
-  desc!: string;
-  label!: string;
   val!: number;
-  notes?: string;
 
   constructor(entry: DictEntry) {
-    super();
-    this.desc = entry[KEY_DESC] as string;
-    this.label = entry[KEY_LABEL] as string;
+    super(entry);
     this.val = parseInt(entry[KEY_VAL] as string);
-    this.notes = entry[KEY_NOTES] as string;
   }
 
   override sortValue(): number {
@@ -330,22 +322,20 @@ class GameEnumVal extends GameEntry {
 }
 
 class GameEnum extends GameEntry {
-  label?: string; // not provided in constructor
   vals!: GameEnumVal[];
 
   constructor(entry: DictEntry) {
-    super();
+    super(entry);
     this.vals = (entry['vals'] as DictEntry[]).map(v => new GameEnumVal(v));
   }
 }
 
 class GameStruct extends GameEntry {
-  label?: string; // not provided in constructor
   size!: number;
   vars!: GameRelVar[];
 
   constructor(entry: DictEntry) {
-    super();
+    super(entry);
     this.size = parseInt(entry[KEY_SIZE] as string);
     this.vars = (entry['vars'] as DictEntry[]).map(v => new GameRelVar(v));
   }

@@ -174,9 +174,9 @@ export class MapTable extends LitElement {
       case TableType.CodeList:
         return [KEY_ADDR, KEY_LEN, KEY_LABEL, KEY_DESC, KEY_PARAMS, KEY_RET, KEY_NOTES];
       case TableType.StructList:
-        return [KEY_LABEL, KEY_SIZE, KEY_VARS];
+        return [KEY_DESC, KEY_LABEL, KEY_SIZE, KEY_VARS, KEY_NOTES];
       case TableType.EnumList:
-        return [KEY_LABEL, KEY_VALS];
+        return [KEY_DESC, KEY_LABEL, KEY_VALS, KEY_NOTES];
       case TableType.StructDef:
         return [KEY_OFF, KEY_LEN, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.EnumDef:
@@ -379,15 +379,22 @@ export class MapTable extends LitElement {
   }
 
   private renderStructEntry(entry: GameStruct) {
+    // TODO: put toggle in 
     return html`<tr>
       ${this.renderLabel(entry.label!)}
+      <td class="desc">${entry.desc}</td>
       <td class="size">${toHex(entry.size)}</td>
+      <td class="vars">[+] TODO</td>
+      ${this.renderNotes(entry.notes)}
     </tr>`;
   }
 
   private renderEnumEntry(entry: GameEnum) {
     return html`<tr>
+      <td class="desc">${entry.desc}</td>
       ${this.renderLabel(entry.label!)}
+      <td class="vals">[+] TODO</td>
+      ${this.renderNotes(entry.notes)}
     </tr>`;
   }
 

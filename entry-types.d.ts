@@ -29,15 +29,16 @@ declare enum DataTag {
     Arm = 12
 }
 declare abstract class GameEntry {
+    desc: string;
+    label: string;
+    notes?: string;
+    constructor(entry: DictEntry);
     sortValue(): number;
 }
 declare class GameVar extends GameEntry {
-    desc: string;
-    label: string;
     arrCount?: number;
     tags?: DataTag[];
     enum?: string;
-    notes?: string;
     primitive: PrimType;
     structName?: string;
     declaration?: string;
@@ -70,14 +71,11 @@ declare class GameData extends GameVar {
     sortValue(): number;
 }
 declare class GameCode extends GameEntry {
-    desc: string;
-    label: string;
     addr: number;
     size: number;
     mode: string;
     params?: GameVar[];
     return?: GameVar;
-    notes?: string;
     constructor(entry: DictEntry);
     sortValue(): number;
     /** Returns where the function ends */
@@ -86,20 +84,15 @@ declare class GameCode extends GameEntry {
     getReturn(): string;
 }
 declare class GameEnumVal extends GameEntry {
-    desc: string;
-    label: string;
     val: number;
-    notes?: string;
     constructor(entry: DictEntry);
     sortValue(): number;
 }
 declare class GameEnum extends GameEntry {
-    label?: string;
     vals: GameEnumVal[];
     constructor(entry: DictEntry);
 }
 declare class GameStruct extends GameEntry {
-    label?: string;
     size: number;
     vars: GameRelVar[];
     constructor(entry: DictEntry);

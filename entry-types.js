@@ -71,6 +71,11 @@ const MODE_TO_STR = {
 };
 const STR_TO_MODE = swap_key_value(MODE_TO_STR);
 class GameEntry {
+    constructor(entry) {
+        this.desc = entry[KEY_DESC];
+        this.label = entry[KEY_LABEL];
+        this.notes = entry[KEY_NOTES];
+    }
     sortValue() {
         throw new Error('Unsupported');
     }
@@ -78,15 +83,12 @@ class GameEntry {
 class GameVar extends GameEntry {
     constructor(entry) {
         var _a;
-        super();
-        this.desc = entry[KEY_DESC];
-        this.label = entry[KEY_LABEL];
+        super(entry);
         this.parseType(entry[KEY_TYPE]);
         const arrCount = entry[KEY_COUNT];
         this.arrCount = arrCount ? parseInt(arrCount) : undefined;
         this.tags = (_a = entry[KEY_TAGS]) === null || _a === void 0 ? void 0 : _a.map((t) => STR_TO_TAG[t]);
         this.enum = entry[KEY_ENUM];
-        this.notes = entry[KEY_NOTES];
     }
     /** Gets the number of items (1 unless array type) */
     getCount() {
@@ -228,9 +230,7 @@ class GameData extends GameVar {
 }
 class GameCode extends GameEntry {
     constructor(entry) {
-        super();
-        this.desc = entry[KEY_DESC];
-        this.label = entry[KEY_LABEL];
+        super(entry);
         this.addr = parseInt(entry[KEY_ADDR]);
         this.size = parseInt(entry[KEY_SIZE]);
         this.mode = STR_TO_MODE[entry[KEY_MODE]];
@@ -238,7 +238,6 @@ class GameCode extends GameEntry {
         this.params = params === null || params === void 0 ? void 0 : params.map(p => new GameVar(p));
         const ret = entry[KEY_RET];
         this.return = ret ? new GameVar(ret) : undefined;
-        this.notes = entry[KEY_NOTES];
     }
     sortValue() {
         return this.addr;
@@ -257,11 +256,8 @@ class GameCode extends GameEntry {
 }
 class GameEnumVal extends GameEntry {
     constructor(entry) {
-        super();
-        this.desc = entry[KEY_DESC];
-        this.label = entry[KEY_LABEL];
+        super(entry);
         this.val = parseInt(entry[KEY_VAL]);
-        this.notes = entry[KEY_NOTES];
     }
     sortValue() {
         return this.val;
@@ -269,13 +265,13 @@ class GameEnumVal extends GameEntry {
 }
 class GameEnum extends GameEntry {
     constructor(entry) {
-        super();
+        super(entry);
         this.vals = entry['vals'].map(v => new GameEnumVal(v));
     }
 }
 class GameStruct extends GameEntry {
     constructor(entry) {
-        super();
+        super(entry);
         this.size = parseInt(entry[KEY_SIZE]);
         this.vars = entry['vars'].map(v => new GameRelVar(v));
     }
