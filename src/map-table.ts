@@ -6,21 +6,10 @@ import {
 } from './entry-types';
 import { toHex } from './utils';
 import {
-  KEY_ADDR, KEY_DESC, KEY_LABEL, KEY_LEN, KEY_NOTES, KEY_OFF, KEY_PARAMS,
-  KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL, KEY_VALS, KEY_VARS,
-  CATEGORIES, getHeading
-} from './headings';
-
-export enum TableType {
-  None,
-  RamList,
-  CodeList,
-  DataList,
-  StructList,
-  EnumList,
-  StructDef,
-  EnumDef
-}
+  TableType, KEY_ADDR, KEY_DESC, KEY_LABEL, KEY_LEN, KEY_NOTES, KEY_OFF,
+  KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL, KEY_VALS,
+  KEY_VARS, CATEGORIES, getHeading
+} from './constants';
 
 const grayBorder = css`1px solid #808080`;
 
@@ -61,23 +50,24 @@ export class MapTable extends LitElement {
       background-color: #202020;
     }
 
-    .addr, .offset, .length, .val {
+    .addr,
+    .length,
+    .offset,
+    .size,
+    .type,
+    .val {
       font-family: "Courier New", monospace;
       text-align: right;
-    }
-
-    .type {
-      text-align: right;
-      max-width: 300px;
       padding-top: 5px;
     }
 
-    .type, .inline-type {
-      font-family: "Courier New", monospace;
-      font-size: 90%;
+    .type {
+      max-width: 300px;
     }
 
     .inline-type {
+      font-family: "Courier New", monospace;
+      font-size: 90%;
       margin-right: 3px;
     }
 
@@ -174,9 +164,9 @@ export class MapTable extends LitElement {
       case TableType.CodeList:
         return [KEY_ADDR, KEY_LEN, KEY_LABEL, KEY_DESC, KEY_PARAMS, KEY_RET, KEY_NOTES];
       case TableType.StructList:
-        return [KEY_DESC, KEY_LABEL, KEY_SIZE, KEY_VARS, KEY_NOTES];
+        return [KEY_SIZE, KEY_LABEL, KEY_DESC, KEY_VARS, KEY_NOTES];
       case TableType.EnumList:
-        return [KEY_DESC, KEY_LABEL, KEY_VALS, KEY_NOTES];
+        return [KEY_LABEL, KEY_DESC, KEY_VALS, KEY_NOTES];
       case TableType.StructDef:
         return [KEY_OFF, KEY_LEN, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.EnumDef:
@@ -242,21 +232,35 @@ export class MapTable extends LitElement {
       title="${toolTip}">${len}</td>`;
   }
 
-  private hasSubTable(entry: GameVar) {
-    const isEnum = Boolean(entry.enum) && entry.enum! in this.enums;
-    const isStruct = entry.spec() in this.structs;
-    return isEnum || isStruct;
+  private hasSubTable(entry: GameEntry): Boolean {
+    if (entry instanceof GameVar) {
+      const gv = entry as GameVar;
+      const isEnum = Boolean(gv.enum) && gv.enum! in this.enums;
+      const isStruct = gv.spec() in this.structs;
+      return isEnum || isStruct;
+    } else if (entry instanceof GameStruct ||
+      entry instanceof GameEnum) {
+      return true;
+    }
+    return false;
   }
 
-  private renderSubTable(entry: GameVar) {
-    if (Boolean(entry.enum) && entry.enum! in this.enums) {
-      const vals: GameEnumVal[] = this.enums[entry.enum!].vals;
-      return this.renderEnumDef(vals);
-    } else if (entry.spec() in this.structs) {
-      const gs = this.structs[entry.spec()];
-      const pa = this.parentAddr ?
-        this.parentAddr : (entry as GameData).addr;
-      return this.renderStructDef(gs, pa);
+  private renderSubTable(entry: GameEntry) {
+    if (entry instanceof GameVar) {
+      const gv = entry as GameVar;
+      if (Boolean(gv.enum) && gv.enum! in this.enums) {
+        const enm: GameEnum = this.enums[gv.enum!];
+        return this.renderEnumDef(enm);
+      } else if (gv.spec() in this.structs) {
+        const gs = this.structs[gv.spec()];
+        const pa = this.parentAddr ?
+          this.parentAddr : (entry as GameData).addr;
+        return this.renderStructDef(gs, pa);
+      }
+    } else if (entry instanceof GameStruct) {
+      return this.renderStructDef(entry as GameStruct);
+    } else if (entry instanceof GameEnum) {
+      return this.renderEnumDef(entry as GameEnum);
     }
     return '';
   }
@@ -268,7 +272,7 @@ export class MapTable extends LitElement {
     return html`<td class="label">${label}</td>`
   }
 
-  private renderDesc(entry: GameVar) {
+  private renderToggleAndTable(entry: GameEntry) {
     let toggle: any = '';
     let table: any = '';
     if (this.hasSubTable(entry)) {
@@ -280,6 +284,11 @@ export class MapTable extends LitElement {
         table = this.renderSubTable(entry);
       }
     }
+    return [toggle, table];
+  }
+
+  private renderDesc(entry: GameEntry) {
+    const [toggle, table] = this.renderToggleAndTable(entry);
     return html`<td class="desc">
       <span class="desc-span">${entry.desc}${toggle}</span>
       ${table}
@@ -310,9 +319,8 @@ export class MapTable extends LitElement {
       return '';
     }
     const toolTip = entry.getToolTip();
-    return html`<td>
-      <div class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
-        title="${toolTip}">${toHex(entry.size)}</div>
+    return html`<td class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
+      title="${toolTip}">${toHex(entry.size)}
     </td>`;
   }
 
@@ -378,22 +386,36 @@ export class MapTable extends LitElement {
     </tr>`;
   }
 
+  private renderStructSize(size: number) {
+    if (this.hiddenColumns.has(KEY_SIZE)) {
+      return '';
+    }
+    return html`<td class="size">${toHex(size)}</td>`;
+  }
+
   private renderStructEntry(entry: GameStruct) {
-    // TODO: put toggle in 
+    const [toggle, table] = this.renderToggleAndTable(entry);
+    const vars = html`<td class="vars">${toggle}${table}</td>`;
     return html`<tr>
-      ${this.renderLabel(entry.label!)}
-      <td class="desc">${entry.desc}</td>
-      <td class="size">${toHex(entry.size)}</td>
-      <td class="vars">[+] TODO</td>
+      ${this.renderStructSize(entry.size)}
+      ${this.renderLabel(entry.label)}
+      <td class="desc">
+        <span class="desc-span">${entry.desc}</span>
+      </td>
+      ${vars}
       ${this.renderNotes(entry.notes)}
     </tr>`;
   }
 
   private renderEnumEntry(entry: GameEnum) {
+    const [toggle, table] = this.renderToggleAndTable(entry);
+    const vals = html`<td class="vals">${toggle}${table}</td>`;
     return html`<tr>
-      <td class="desc">${entry.desc}</td>
-      ${this.renderLabel(entry.label!)}
-      <td class="vals">[+] TODO</td>
+      ${this.renderLabel(entry.label)}
+      <td class="desc">
+        <span class="desc-span">${entry.desc}</span>
+      </td>
+      ${vals}
       ${this.renderNotes(entry.notes)}
     </tr>`;
   }
@@ -413,7 +435,7 @@ export class MapTable extends LitElement {
     </tr>`;
   }
 
-  private renderStructDef(entry: GameStruct, parentAddr: number) {
+  private renderStructDef(entry: GameStruct, parentAddr: number = NaN) {
     return html`<map-table
       .tableType="${TableType.StructDef}"
       .entries="${entry.vars}"
@@ -433,10 +455,10 @@ export class MapTable extends LitElement {
     </tr>`;
   }
 
-  private renderEnumDef(entry: GameEnumVal[]) {
+  private renderEnumDef(entry: GameEnum) {
     return html`<map-table
       .tableType="${TableType.EnumDef}"
-      .entries="${entry}"
+      .entries="${entry.vals}"
       .structs="${this.structs}"
       .enums="${this.enums}"
       .hiddenColumns="${this.hiddenColumns}">

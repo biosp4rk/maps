@@ -6,7 +6,7 @@ import { toHex } from "./utils";
 import {
   KEY_ADDR, KEY_COUNT, KEY_DESC, KEY_ENUM, KEY_LABEL, KEY_MODE, KEY_NOTES,
   KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL
-} from "./headings";
+} from "./constants";
 
 export type DictEntry = {[key: string]: unknown};
 

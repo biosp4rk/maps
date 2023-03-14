@@ -1,4 +1,57 @@
 
+export const GAMES = [
+  {
+    label: 'Metroid Fusion',
+    value: 'mf',
+  },
+  {
+    label: 'Metroid Zero Mission',
+    value: 'zm',
+  }
+];
+
+export const MAP_RAM = 'ram';
+export const MAP_CODE = 'code';
+export const MAP_DATA = 'data';
+export const MAP_STRUCTS = 'structs';
+export const MAP_ENUMS = 'enums';
+
+export const MAPS = [
+  {
+    label: 'RAM',
+    value: MAP_RAM
+  },
+  {
+    label: 'ROM Code',
+    value: MAP_CODE
+  },
+  {
+    label: 'ROM Data',
+    value: MAP_DATA
+  },
+  {
+    label: 'Structs',
+    value: MAP_STRUCTS
+  },
+  {
+    label: 'Enums',
+    value: MAP_ENUMS
+  }
+];
+
+export enum TableType {
+  None,
+  RamList,
+  CodeList,
+  DataList,
+  StructList,
+  EnumList,
+  StructDef,
+  EnumDef
+}
+
+export const REGIONS = ['U', 'E', 'J', 'C'];
+
 export const KEY_ADDR = 'addr';
 export const KEY_COUNT = 'count';
 export const KEY_DESC = 'desc';
@@ -9,7 +62,7 @@ export const KEY_MODE = 'mode';
 export const KEY_NOTES = 'notes';
 export const KEY_OFF = 'offset';
 export const KEY_PARAMS = 'params';
-export const KEY_RET = 'returns';
+export const KEY_RET = 'return';
 export const KEY_SIZE = 'size';
 export const KEY_TAGS = 'tags';
 export const KEY_TYPE = 'type';
@@ -65,13 +118,23 @@ export const CATEGORIES: { [key: string]: string } = {
   'arm': 'ARM',
 };
 
+export function getMainTableType(map: string): TableType {
+  switch(map) {
+    case MAP_RAM: return TableType.RamList;
+    case MAP_DATA: return TableType.DataList;
+    case MAP_CODE: return TableType.CodeList;
+    case MAP_STRUCTS: return TableType.StructList;
+    case MAP_ENUMS: return TableType.EnumList;
+    default: return TableType.None;
+  }
+}
+
 export function getHeading(key: string): string {
   return HEADINGS[key];
 }
 
-// TODO: use constants for map
-export function getHideableColumns(map: string): { head: string; key: string; }[] {
-  if (map === 'ram' || map === 'data') {
+export function getHideableColumns(tableType: TableType): { head: string; key: string; }[] {
+  if (tableType === TableType.RamList || tableType === TableType.DataList) {
     return [
       {
         head: HEAD_LEN,
@@ -94,7 +157,7 @@ export function getHideableColumns(map: string): { head: string; key: string; }[
         key: KEY_NOTES
       }
     ];
-  } else if (map === 'code') {
+  } else if (tableType === TableType.CodeList) {
     return [
       {
         head: HEAD_LEN,
@@ -117,7 +180,7 @@ export function getHideableColumns(map: string): { head: string; key: string; }[
         key: KEY_NOTES
       }
     ];
-  } else if (map === 'structs') {
+  } else if (tableType === TableType.StructList) {
     return [
       {
         head: HEAD_LABEL,
@@ -132,7 +195,7 @@ export function getHideableColumns(map: string): { head: string; key: string; }[
         key: KEY_NOTES
       }
     ];
-  } else if (map === 'enums') {
+  } else if (tableType === TableType.EnumList) {
     return [
       {
         head: HEAD_LABEL,
