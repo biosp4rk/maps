@@ -26,20 +26,14 @@ export class MapTable extends LitElement {
       border-collapse: collapse;
     }
 
-    th, td {
-      padding: 3px 5px;
-    }
-
-    td {
-      vertical-align: top;
-    }
-
     th {
       padding: 3px 10px;
     }
 
     td {
       overflow-wrap: break-word;
+      padding: 2px 5px;
+      vertical-align: baseline;
     }
     
     tbody tr:nth-child(odd) {
@@ -58,16 +52,18 @@ export class MapTable extends LitElement {
     .val {
       font-family: "Courier New", monospace;
       text-align: right;
-      padding-top: 5px;
     }
 
+    .type, .inline-type {
+      font-size: 90%;
+    }
+    
     .type {
       max-width: 300px;
     }
 
     .inline-type {
       font-family: "Courier New", monospace;
-      font-size: 90%;
       margin-right: 3px;
     }
 
