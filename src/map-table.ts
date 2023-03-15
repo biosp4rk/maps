@@ -31,9 +31,9 @@ export class MapTable extends LitElement {
     }
 
     td {
-      overflow-wrap: break-word;
-      padding: 2px 5px;
-      vertical-align: baseline;
+      overflow-wrap: normal;
+      padding: 3px 5px;
+      vertical-align: top;
     }
     
     tbody tr:nth-child(odd) {
@@ -52,6 +52,8 @@ export class MapTable extends LitElement {
     .val {
       font-family: "Courier New", monospace;
       text-align: right;
+      padding-top: 5px;
+      padding-bottom: 1px;
     }
 
     .type, .inline-type {
@@ -244,13 +246,18 @@ export class MapTable extends LitElement {
   private renderSubTable(entry: GameEntry) {
     if (entry instanceof GameVar) {
       const gv = entry as GameVar;
-      if (Boolean(gv.enum) && gv.enum! in this.enums) {
-        const enm: GameEnum = this.enums[gv.enum!];
-        return this.renderEnumDef(enm);
-      } else if (gv.spec() in this.structs) {
-        const gs = this.structs[gv.spec()];
-        const pa = this.parentAddr ?
-          this.parentAddr : (entry as GameData).addr;
+      if (gv.enum && gv.enum! in this.enums) {
+        const ge: GameEnum = this.enums[gv.enum!];
+        return this.renderEnumDef(ge);
+      } else if (gv.structName && gv.structName! in this.structs) {
+        const gs = this.structs[gv.structName!];
+        let pa = NaN;
+        if (this.tableType === TableType.RamList ||
+          this.tableType === TableType.DataList) {
+          pa = (entry as GameData).addr;
+        } else if (this.parentAddr) {
+          pa = this.parentAddr + (entry as GameRelVar).offset;
+        }
         return this.renderStructDef(gs, pa);
       }
     } else if (entry instanceof GameStruct) {
@@ -420,7 +427,8 @@ export class MapTable extends LitElement {
     const toolTip = entry.getOffsetToolTip(this.parentAddr);
     // structs can have tags, but they're left out to save space
     return html`<tr>
-      <td class="offset has-tooltip" title="${toolTip}">
+      <td class="offset ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
+        title="${toolTip}">
         ${toHex(entry.offset)}
       </td>
       ${this.renderVarLength(entry)}

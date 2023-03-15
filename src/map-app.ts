@@ -16,6 +16,10 @@ const URL_GAME = 'game';
 const URL_MAP = 'map';
 const URL_REGION = 'region';
 const URL_FILTER = 'filter';
+const URL_OPTIONS = 'options';
+
+const OPT_STRUCTS = 's';
+const OPT_ENUMS = 'e';
 
 /** Renders the application */
 @customElement('map-app')
@@ -144,6 +148,8 @@ export class MapApp extends LitElement {
 
   private tableType: TableType = getMainTableType(this.map);
   private filter: string = '';
+  private searchStructs: boolean = false;
+  private searchEnums: boolean = false;
   private hiddenColumns: Set<string> = new Set<string>([KEY_TAGS, KEY_LABEL, KEY_NOTES]);
   private pageSize: number = 1000;
   private pageIndex: number = 0;
@@ -183,6 +189,13 @@ export class MapApp extends LitElement {
     if (filter) {
       this.filter = filter;
     }
+    // check for options
+    const optStr = params.get(URL_OPTIONS);
+    if (optStr) {
+      const opts = optStr.split(',');
+      this.searchStructs = opts.includes(OPT_STRUCTS)
+      this.searchEnums = opts.includes(OPT_ENUMS)
+    }
   }
 
   private setUrlParams() {
@@ -192,6 +205,13 @@ export class MapApp extends LitElement {
     params.set(URL_MAP, this.map);
     if (this.filter) {
       params.set(URL_FILTER, this.filter);
+    }
+    // check options
+    const opts = [];
+    if (this.searchStructs) { opts.push(OPT_STRUCTS); }
+    if (this.searchEnums) { opts.push(OPT_ENUMS); }
+    if (opts.length > 0) {
+      params.set(URL_OPTIONS, opts.join(','));
     }
     const url = window.location.pathname + '?' + params.toString();
     window.history.replaceState(null, '', url);
@@ -341,7 +361,7 @@ export class MapApp extends LitElement {
       }
     }
     // check if entry is struct
-    if (structName && structName in this.structs) {
+    if (this.searchStructs && structName && structName in this.structs) {
       const es = this.structs[structName];
       if (es.vars.some(
         rv => this.checkDescFilter(rv.desc, item, rv.structName, rv.enum))
@@ -350,7 +370,7 @@ export class MapApp extends LitElement {
       }
     }
     // check if entry has enum
-    if (enm && enm in this.enums) {
+    if (this.searchEnums && enm && enm in this.enums) {
       const ee = this.enums[enm].vals;
       if (ee.some(ev => this.checkDescFilter(ev.desc, item))) {
         return true;
@@ -434,8 +454,6 @@ export class MapApp extends LitElement {
   private applyFilter() {
     // parse to get filter items
     const items = FilterParser.parse(this.filter);
-    const checkStruct = this.filterStructs();
-    const checkEnum = this.filterEnums();
     this.pageIndex = 0;
 
     // check each filter item
@@ -450,12 +468,15 @@ export class MapApp extends LitElement {
             let enm = undefined;
             if (this.tableIs(TableType.RamList, TableType.DataList)) {
               const gd = entry as GameData;
-              if (checkStruct) {
+              if (this.searchStructs) {
                 sname = gd.structName;
               }
-              if (checkEnum) {
+              if (this.searchEnums) {
                 enm = gd.enum;
               }
+            } else if (this.tableIs(TableType.StructList) && this.searchStructs) {
+              const gs = entry as GameStruct;
+              sname = gs.label;
             }
             return this.checkDescFilter(entry.desc, item, sname, enm);
           });
@@ -515,14 +536,14 @@ export class MapApp extends LitElement {
     this.shadowRoot?.querySelector('map-table')!.collapseAll();
   }
 
-  private filterStructs(): boolean {
+  private structsChangeHandler() {
     const cb = this.shadowRoot?.querySelector('#filter-structs') as HTMLInputElement;
-    return cb.checked;
+    this.searchStructs = cb.checked;
   }
 
-  private filterEnums(): boolean {
+  private enumsChangeHandler() {
     const cb = this.shadowRoot?.querySelector('#filter-enums') as HTMLInputElement;
-    return cb.checked;
+    this.searchEnums = cb.checked;
   }
 
   private gameChangeHandler() {
@@ -654,11 +675,15 @@ export class MapApp extends LitElement {
             </div>
             <ul id="filter-options" class="checkbox-list">
               <li title="Include struct info when filtering">
-                <input type="checkbox" id="filter-structs">
+                <input type="checkbox" id="filter-structs"
+                  .checked=${this.searchStructs}
+                  @change='${this.structsChangeHandler}'>
                 <label for="filter-structs">Structs</label>
               </li>
               <li title="Include enum info when filtering">
-                <input type="checkbox" id="filter-enums">
+                <input type="checkbox" id="filter-enums"
+                  .checked=${this.searchEnums}
+                  @change='${this.enumsChangeHandler}'>
                 <label for="filter-enums">Enums</label>
               </li>
             </ul>

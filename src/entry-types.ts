@@ -253,6 +253,9 @@ class GameRelVar extends GameVar {
 
   /** Returns the address of this field in item 0 */
   getOffsetToolTip(parentAddr: number): string {
+    if (isNaN(parentAddr)) {
+      return '';
+    }
     return 'Address: ' + toHex(parentAddr + this.offset);
   }
 }
