@@ -11,6 +11,7 @@ export default {
 	output: {
 		file: 'app.js',
 		format: 'iife', // immediately-invoked function expression — suitable for <script> tags
+		name: 'MapApp',
 		sourcemap: true
 	},
 	plugins: [

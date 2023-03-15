@@ -244,7 +244,7 @@ export class MapApp extends LitElement {
   }
 
   private getJsonUrl(jsonName: string): string {
-    const baseUrl = `/json/${this.game}/`;
+    const baseUrl = `/maps/json/${this.game}/`;
     const fileName = jsonName + '.json';
     const ver = '?v=' + VER;
     return baseUrl + fileName + ver;
