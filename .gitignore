@@ -16,10 +16,20 @@ custom-elements.json
 /map-table.d.ts
 /map-table.d.ts.map
 
-/map-row.js
-/map-row.js.map
-/map-row.d.ts
-/map-row.d.ts.map
+/constants.js
+/constants.js.map
+/constants.d.ts
+/constants.d.ts.map
+
+/entry-types.js
+/entry-types.js.map
+/entry-types.d.ts
+/entry-types.d.ts.map
+
+/filter-parser.js
+/filter-parser.js.map
+/filter-parser.d.ts
+/filter-parser.d.ts.map
 
 /utils.js
 /utils.js.map
