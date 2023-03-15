@@ -464,21 +464,24 @@ export class MapApp extends LitElement {
         case SearchType.Quote:
         case SearchType.Regex:
           this.filterData = this.filterData.filter(entry => {
-            let sname = undefined;
-            let enm = undefined;
+            let sName = undefined;
+            let eName = undefined;
             if (this.tableIs(TableType.RamList, TableType.DataList)) {
               const gd = entry as GameData;
               if (this.searchStructs) {
-                sname = gd.structName;
+                sName = gd.structName;
               }
               if (this.searchEnums) {
-                enm = gd.enum;
+                eName = gd.enum;
               }
             } else if (this.tableIs(TableType.StructList) && this.searchStructs) {
               const gs = entry as GameStruct;
-              sname = gs.label;
+              sName = gs.label;
+            } else if (this.tableIs(TableType.EnumList) && this.searchEnums) {
+              const ge = entry as GameEnum;
+              eName = ge.label;
             }
-            return this.checkDescFilter(entry.desc, item, sname, enm);
+            return this.checkDescFilter(entry.desc, item, sName, eName);
           });
           break;
         case SearchType.AddrEQ:
