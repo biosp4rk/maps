@@ -1,12 +1,12 @@
 export {
   GameEntry, GameVar, GameRelVar, GameData, GameCode,
-  GameStruct, GameEnumVal, GameEnum, GameStructList, GameEnumList
+  GameStruct, GameEnumVal, GameEnum, GameStructDict, GameEnumDict
 };
 import { toHex } from "./utils";
 import {
   KEY_ADDR, KEY_COUNT, KEY_DESC, KEY_ENUM, KEY_LABEL, KEY_MODE, KEY_NOTES,
   KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL
-} from "./headings";
+} from "./constants";
 
 export type DictEntry = {[key: string]: unknown};
 
@@ -87,33 +87,37 @@ const MODE_TO_STR = {
 const STR_TO_MODE = swap_key_value(MODE_TO_STR);
 
 abstract class GameEntry {
+  desc!: string;
+  label!: string;
+  notes?: string;
+
+  constructor(entry: DictEntry) {
+    this.desc = entry[KEY_DESC] as string;
+    this.label = entry[KEY_LABEL] as string;
+    this.notes = entry[KEY_NOTES] as string;
+  }
+
   sortValue(): number {
     throw new Error('Unsupported');
   }
 }
 
 class GameVar extends GameEntry {
-  desc!: string;
-  label!: string;
   arrCount?: number;
   tags?: DataTag[];
   enum?: string;
-  notes?: string;
   // used for type
   primitive!: PrimType;
   structName?: string;
   declaration?: string;
 
   constructor(entry: DictEntry) {
-    super();
-    this.desc = entry[KEY_DESC] as string;
-    this.label = entry[KEY_LABEL] as string;
+    super(entry);
     this.parseType(entry[KEY_TYPE] as string);
     const arrCount = entry[KEY_COUNT] as string;
     this.arrCount = arrCount ? parseInt(arrCount) : undefined;
     this.tags = (entry[KEY_TAGS] as string[])?.map((t: string) => STR_TO_TAG[t]);
     this.enum = entry[KEY_ENUM] as string;
-    this.notes = entry[KEY_NOTES] as string;
   }
 
   /** Gets the number of items (1 unless array type) */
@@ -121,7 +125,7 @@ class GameVar extends GameEntry {
     return this.arrCount ?? 1;
   }
 
-  getSpecSize(structs: GameStructList) : number {
+  getSpecSize(structs: GameStructDict) : number {
     switch (+this.primitive) {
       case PrimType.U8:
       case PrimType.S8:
@@ -145,7 +149,7 @@ class GameVar extends GameEntry {
   }
 
   /** Gets the physical size of an individual item */
-  getSize(structs: GameStructList): number {
+  getSize(structs: GameStructDict): number {
     let size = this.getSpecSize(structs);
     if (!this.declaration) {
       return size;
@@ -174,12 +178,12 @@ class GameVar extends GameEntry {
   }
 
   /** Gets the total physical size of all items */
-  getLength(structs: GameStructList): number {
+  getLength(structs: GameStructDict): number {
     return this.getCount() * this.getSize(structs);
   }
 
   /** Returns the item size and count if count > 1 */
-  getLengthToolTip(structs: GameStructList): string {
+  getLengthToolTip(structs: GameStructDict): string {
     const count = this.getCount();
     if (count == 1) {
       return '';
@@ -249,6 +253,9 @@ class GameRelVar extends GameVar {
 
   /** Returns the address of this field in item 0 */
   getOffsetToolTip(parentAddr: number): string {
+    if (isNaN(parentAddr)) {
+      return '';
+    }
     return 'Address: ' + toHex(parentAddr + this.offset);
   }
 }
@@ -268,19 +275,14 @@ class GameData extends GameVar {
 }
 
 class GameCode extends GameEntry {
-  desc!: string;
-  label!: string;
   addr!: number;
   size!: number;
   mode!: string;
   params?: GameVar[];
   return?: GameVar;
-  notes?: string;
 
   constructor(entry: DictEntry) {
-    super();
-    this.desc = entry[KEY_DESC] as string;
-    this.label = entry[KEY_LABEL] as string;
+    super(entry);
     this.addr = parseInt(entry[KEY_ADDR] as string);
     this.size = parseInt(entry[KEY_SIZE] as string);
     this.mode = STR_TO_MODE[entry[KEY_MODE] as string];
@@ -288,7 +290,6 @@ class GameCode extends GameEntry {
     this.params = params?.map(p => new GameVar(p));
     const ret = entry[KEY_RET] as DictEntry;
     this.return = ret ? new GameVar(ret) : undefined;
-    this.notes = entry[KEY_NOTES] as string;
   }
 
   override sortValue(): number {
@@ -311,17 +312,11 @@ class GameCode extends GameEntry {
 }
 
 class GameEnumVal extends GameEntry {
-  desc!: string;
-  label!: string;
   val!: number;
-  notes?: string;
 
   constructor(entry: DictEntry) {
-    super();
-    this.desc = entry[KEY_DESC] as string;
-    this.label = entry[KEY_LABEL] as string;
+    super(entry);
     this.val = parseInt(entry[KEY_VAL] as string);
-    this.notes = entry[KEY_NOTES] as string;
   }
 
   override sortValue(): number {
@@ -333,7 +328,7 @@ class GameEnum extends GameEntry {
   vals!: GameEnumVal[];
 
   constructor(entry: DictEntry) {
-    super();
+    super(entry);
     this.vals = (entry['vals'] as DictEntry[]).map(v => new GameEnumVal(v));
   }
 }
@@ -343,11 +338,11 @@ class GameStruct extends GameEntry {
   vars!: GameRelVar[];
 
   constructor(entry: DictEntry) {
-    super();
+    super(entry);
     this.size = parseInt(entry[KEY_SIZE] as string);
     this.vars = (entry['vars'] as DictEntry[]).map(v => new GameRelVar(v));
   }
 }
 
-type GameStructList = { [key: string]: GameStruct };
-type GameEnumList = { [key: string]: GameEnum };
+type GameStructDict = { [key: string]: GameStruct };
+type GameEnumDict = { [key: string]: GameEnum };

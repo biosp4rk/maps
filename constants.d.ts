@@ -1,3 +1,27 @@
+export declare const GAMES: {
+    label: string;
+    value: string;
+}[];
+export declare const MAP_RAM = "ram";
+export declare const MAP_CODE = "code";
+export declare const MAP_DATA = "data";
+export declare const MAP_STRUCTS = "structs";
+export declare const MAP_ENUMS = "enums";
+export declare const MAPS: {
+    label: string;
+    value: string;
+}[];
+export declare enum TableType {
+    None = 0,
+    RamList = 1,
+    CodeList = 2,
+    DataList = 3,
+    StructList = 4,
+    EnumList = 5,
+    StructDef = 6,
+    EnumDef = 7
+}
+export declare const REGIONS: string[];
 export declare const KEY_ADDR = "addr";
 export declare const KEY_COUNT = "count";
 export declare const KEY_DESC = "desc";
@@ -18,9 +42,10 @@ export declare const KEY_VARS = "vars";
 export declare const CATEGORIES: {
     [key: string]: string;
 };
+export declare function getMainTableType(map: string): TableType;
 export declare function getHeading(key: string): string;
-export declare function getHideableColumns(map: string): {
+export declare function getHideableColumns(tableType: TableType): {
     head: string;
     key: string;
 }[];
-//# sourceMappingURL=headings.d.ts.map
+//# sourceMappingURL=constants.d.ts.map
