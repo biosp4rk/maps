@@ -35,3 +35,8 @@ Source code for app at [labk.org/maps](https://labk.org/maps/)
 
 ## Planned Features
 - Filter by category, type, label, and/or notes
+
+## Build for Production
+Run these on the `build` branch:
+- `npm run build-js`
+- `npm run build`
