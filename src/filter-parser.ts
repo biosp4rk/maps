@@ -217,12 +217,19 @@ export class FilterParser {
 
   private static parseFilterQuote(): void {
     this.exclude = false;
+    let terminated = false;
     while (this.index < this.filter.length) {
       const c = this.filter[this.index++];
       if (c === '"') {
+        terminated = true;
         break;
       }
       this.addToLast(c);
+    }
+    if (!terminated) {
+      // TODO: indicate problem to user
+      this.items.pop();
+      return;
     }
     this.parseFilterSpace();
   }
@@ -230,9 +237,11 @@ export class FilterParser {
   private static parseFilterRegex(): void {
     this.exclude = false;
     let escaped = false;
+    let terminated = false;
     while (this.index < this.filter.length) {
       const c = this.filter[this.index++];
       if (c === '/' && !escaped) {
+        terminated = true;
         break;
       }
       if (escaped) {
@@ -241,6 +250,11 @@ export class FilterParser {
         escaped = true;
       }
       this.addToLast(c);
+    }
+    if (!terminated) {
+      // TODO: indicate problem to user
+      this.items.pop();
+      return;
     }
     this.parseFilterSpace();
   }
