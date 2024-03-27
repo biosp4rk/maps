@@ -10,7 +10,7 @@ import {
 import { FilterItem, FilterParser, SearchType } from './filter-parser';
 import "./map-table";
 
-const VER = 2;
+const VERSION = 3;
 
 const URL_GAME = 'game';
 const URL_MAP = 'map';
@@ -246,7 +246,7 @@ export class MapApp extends LitElement {
   private getJsonUrl(jsonName: string): string {
     const baseUrl = `/json/${this.game}/`;
     const fileName = jsonName + '.json';
-    const ver = '?v=' + VER;
+    const ver = '?v=' + VERSION;
     return baseUrl + fileName + ver;
   }
 
