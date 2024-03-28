@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GBA Metroid Data Maps</title>
+    <style>
+      body {
+        background-color: #1a1a1a;
+        color: white;
+        font-family: verdana, sans-serif;
+        font-size: 16px;
+        margin: 20px;
+      }
+      li {
+        margin: 8px 0px;
+      }
+      code {
+        background-color: #111;
+        padding: 2px 4px;
+      }
+      a:link,
+      a:visited {
+        color: #5af;
+        text-decoration: none;
+      }
+      a:hover {
+        color: #26d;
+        text-decoration: underline;
+      }
+      .multi-line-li {
+        margin-bottom: 8px;
+      }
+      .map-link {
+        font-size: 18px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h2>GBA Metroid Data Maps</h2>
+    <ul class="map-link">
+      <li>Metroid Fusion
+        <ul>
+          <li><a href="app?game=mf&map=ram">RAM Map</a></li>
+          <li><a href="app?game=mf&map=code">ROM Code Map</a></li>
+          <li><a href="app?game=mf&map=data">ROM Data Map</a></li>
+          <li><a href="app?game=mf&map=structs">Struct List</a></li>
+          <li><a href="app?game=mf&map=enums">Enum List</a></li>
+        </ul>
+      </li>
+      <li>Metroid Zero Mission
+        <ul>
+          <li><a href="app?game=zm&map=ram">RAM Map</a></li>
+          <li><a href="app?game=zm&map=code">ROM Code Map</a></li>
+          <li><a href="app?game=zm&map=data">ROM Data Map</a></li>
+          <li><a href="app?game=zm&map=structs">Struct List</a></li>
+          <li><a href="app?game=zm&map=enums">Enum List</a></li>
+        </ul>
+      </li>
+    </ul>
+    <h3>Filtering</h3>
+      <ul>
+        <li>Filters are case insensitive</li>
+        <li>Search for addresses by putting <code>=</code> before a hex address
+          <ul>
+            <li><code>=3897C</code> - entry with the address 0x3897C</li>
+          </ul>
+        </li>
+        <li>Search for address ranges by putting <code>&gt</code>, <code>&lt</code>, <code>&gt=</code>, or <code>&lt=</code> before a hex address
+          <ul>
+            <li><code>&lt=A8D3C</code> - entries with an address of 0xA8D3C or less</li>
+            <li><code>&gt=42D74 &lt43788</code> - entries with an address between 0x42D74 and 0x43788</li>
+          </ul>
+        </li>
+        <li>Search for entries near an address by putting <code>~</code> before a hex address
+          <ul>
+            <li>
+              <div class="multi-line-li">If the address is within an entry, it returns the matched entry and the entries before and after</div>
+              <div>Otherwise, it returns the nearest entries before and after the address</div>
+            </li>
+            <li><code>~43788</code> - entry at 0x43788 (if an entry matches) and the entries before and after</li>
+          </ul>
+        </li>
+        <li>Search for phrases by putting <code>"</code> around the phrase
+          <ul>
+            <li><code>"chozo statue"</code> - entries with the phrase "chozo statue"</li>
+          </ul>
+        </li>
+        <li>Search for regex patterns by putting <code>/</code> around the pattern
+          <ul>
+            <li><code>/sprites?/</code> - entries with "sprite" or "sprites"</li>
+            <li><code>/(ridley|kraid)/ statue</code> - entries with "ridley statue" or "kraid statue"</li>
+          </ul>
+        </li>
+        <li>Put <code>-</code> before a term, phrase, or pattern to exclude it from the results
+          <ul>
+            <li><code>samus -eater</code> - entries with "samus" that don't have "eater"</li>
+          </ul>
+        </li>
+        <li>Clear a filter by pressing <code>esc</code></li>
+      </ul>
+    <h3>Links</h3>
+      <ul>
+        <li><a href="https://github.com/biosp4rk/maps">Maps viewer source code</a></li>
+        <li><a href="https://github.com/biosp4rk/mf-zm-info">Game data info files</a></li>
+      </ul>
+  </body>
+
+</html>
