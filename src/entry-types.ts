@@ -4,8 +4,8 @@ export {
 };
 import { toHex } from "./utils";
 import {
-  KEY_ADDR, KEY_COUNT, KEY_DESC, KEY_ENUM, KEY_LABEL, KEY_MODE, KEY_NOTES,
-  KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL
+  KEY_ADDR, KEY_CAT, KEY_COUNT, KEY_DESC, KEY_ENUM, KEY_LABEL, KEY_MODE, KEY_NOTES,
+  KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TYPE, KEY_VAL
 } from "./constants";
 
 export type DictEntry = {[key: string]: unknown};
@@ -40,39 +40,42 @@ const PRIM_TO_STR = {
 
 const STR_TO_PRIM = swap_key_value(PRIM_TO_STR);
 
-enum DataTag {
+enum Category {
   Flags,
   Ascii,
   Text,
-  Rle,
-  LZ,
   Gfx,
   Tilemap,
   Palette,
   OamFrame,
   BGBlocks,
   BGMap,
+  Pcm,
   Thumb,
   Arm
 }
 
-const TAG_TO_STR = {
-  [DataTag.Flags]: "flags",
-  [DataTag.Ascii]: "ascii",
-  [DataTag.Text]: "text",
-  [DataTag.Rle]: "rle",
-  [DataTag.LZ]: "lz",
-  [DataTag.Gfx]: "gfx",
-  [DataTag.Tilemap]: "tilemap",
-  [DataTag.Palette]: "palette",
-  [DataTag.OamFrame]: "oam_frame",
-  [DataTag.BGBlocks]: "bg_blocks",
-  [DataTag.BGMap]: "bg_map",
-  [DataTag.Thumb]: "thumb",
-  [DataTag.Arm]: "arm"
+const CAT_TO_STR = {
+  [Category.Flags]: "flags",
+  [Category.Ascii]: "ascii",
+  [Category.Text]: "text",
+  [Category.Gfx]: "gfx",
+  [Category.Tilemap]: "tilemap",
+  [Category.Palette]: "palette",
+  [Category.OamFrame]: "oam_frame",
+  [Category.BGBlocks]: "bg_blocks",
+  [Category.BGMap]: "bg_map",
+  [Category.Pcm]: "pcm",
+  [Category.Thumb]: "thumb",
+  [Category.Arm]: "arm"
 }
 
-const STR_TO_TAG = swap_key_value(TAG_TO_STR);
+const STR_TO_CAT = swap_key_value(CAT_TO_STR);
+
+// enum Compression {
+//   Rle,
+//   LZ
+// }
 
 enum CodeMode {
   Thumb,
@@ -104,7 +107,7 @@ abstract class GameEntry {
 
 class GameVar extends GameEntry {
   arrCount?: number;
-  tags?: DataTag[];
+  cat?: Category;
   enum?: string;
   // used for type
   primitive!: PrimType;
@@ -116,7 +119,8 @@ class GameVar extends GameEntry {
     this.parseType(entry[KEY_TYPE] as string);
     const arrCount = entry[KEY_COUNT] as string;
     this.arrCount = arrCount ? parseInt(arrCount) : undefined;
-    this.tags = (entry[KEY_TAGS] as string[])?.map((t: string) => STR_TO_TAG[t]);
+    const cat = entry[KEY_CAT] as string;
+    this.cat = cat ? STR_TO_CAT[cat] : undefined;
     this.enum = entry[KEY_ENUM] as string;
   }
 
@@ -199,8 +203,8 @@ class GameVar extends GameEntry {
     return PRIM_TO_STR[this.primitive];
   }
 
-  tagStrs(): string[] | undefined {
-    return this.tags?.map(t => TAG_TO_STR[t]);
+  catStr(): string | undefined {
+    return this.cat ? CAT_TO_STR[this.cat] : undefined;
   }
 
   typeStr(): string {

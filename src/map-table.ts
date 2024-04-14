@@ -6,8 +6,8 @@ import {
 } from './entry-types';
 import { toHex } from './utils';
 import {
-  TableType, KEY_ADDR, KEY_DESC, KEY_LABEL, KEY_LEN, KEY_NOTES, KEY_OFF,
-  KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TAGS, KEY_TYPE, KEY_VAL, KEY_VALS,
+  TableType, KEY_ADDR, KEY_CAT, KEY_DESC, KEY_LABEL, KEY_LEN, KEY_NOTES,
+  KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TYPE, KEY_VAL, KEY_VALS,
   KEY_VARS, CATEGORIES, getHeading
 } from './constants';
 
@@ -133,7 +133,7 @@ export class MapTable extends LitElement {
   /** Address of parent entry if table is part of row */
   @property({ type: Number }) parentAddr = NaN;
   /** Columns that should not be displayed */
-  @property({ type: Set }) hiddenColumns: Set<string> = new Set<string>();
+  @property({ type: Object }) hiddenColumns: Set<string> = new Set<string>();
 
   /** Indexes of rows that are expanded */
   private expandedItems: Set<string> = new Set<string>();
@@ -158,7 +158,7 @@ export class MapTable extends LitElement {
     switch (this.tableType) {
       case TableType.RamList:
       case TableType.DataList:
-        return [KEY_ADDR, KEY_LEN, KEY_TAGS, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
+        return [KEY_ADDR, KEY_LEN, KEY_CAT, KEY_TYPE, KEY_LABEL, KEY_DESC, KEY_NOTES];
       case TableType.CodeList:
         return [KEY_ADDR, KEY_LEN, KEY_LABEL, KEY_DESC, KEY_PARAMS, KEY_RET, KEY_NOTES];
       case TableType.StructList:
@@ -211,12 +211,12 @@ export class MapTable extends LitElement {
     return html`<td class="type">${type}</td>`
   }
 
-  private renderTags(tags?: string[]) {
-    if (this.hiddenColumns.has(KEY_TAGS)) {
+  private renderCat(cat?: string) {
+    if (this.hiddenColumns.has(KEY_CAT)) {
       return '';
     }
-    const cats = tags?.map(t => CATEGORIES[t]);
-    return html`<td class="tags">${cats ? cats.join(', ') : ''}</td>`
+    const catName = cat ? CATEGORIES[cat] : undefined;
+    return html`<td class="cat">${catName ?? ''}</td>`
   }
 
   private renderVarLength(entry: GameVar) {
@@ -309,7 +309,7 @@ export class MapTable extends LitElement {
     return html`<tr>
       <td class="addr">${toHex(entry.addr)}</td>
       ${this.renderVarLength(entry)}
-      ${this.renderTags(entry.tagStrs())}
+      ${this.renderCat(entry.catStr())}
       ${this.renderType(entry.typeStr())}
       ${this.renderLabel(entry.label)}
       ${this.renderDesc(entry)}
@@ -425,7 +425,7 @@ export class MapTable extends LitElement {
 
   private renderStructVar(entry: GameRelVar) {
     const toolTip = entry.getOffsetToolTip(this.parentAddr);
-    // structs can have tags, but they're left out to save space
+    // structs can have categories, but they're left out to save space
     return html`<tr>
       <td class="offset ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
         title="${toolTip}">
