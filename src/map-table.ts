@@ -252,11 +252,13 @@ export class MapTable extends LitElement {
       } else if (gv.structName && gv.structName! in this.structs) {
         const gs = this.structs[gv.structName!];
         let pa = NaN;
-        if (this.tableType === TableType.RamList ||
-          this.tableType === TableType.DataList) {
-          pa = (entry as GameData).addr;
-        } else if (this.parentAddr) {
-          pa = this.parentAddr + (entry as GameRelVar).offset;
+        if (!gv.isPtr()) {
+          if (this.tableType === TableType.RamList ||
+            this.tableType === TableType.DataList) {
+            pa = (entry as GameData).addr;
+          } else if (this.parentAddr) {
+            pa = this.parentAddr + (entry as GameRelVar).offset;
+          }
         }
         return this.renderStructDef(gs, pa);
       }

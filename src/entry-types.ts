@@ -27,15 +27,15 @@ export enum PrimType {
 }
 
 const PRIM_TO_STR = {
-  [PrimType.U8]: 'u8',
-  [PrimType.S8]: 's8',
-  [PrimType.Bool]: 'bool',
-  [PrimType.U16]: 'u16',
-  [PrimType.S16]: 's16',
-  [PrimType.U32]: 'u32',
-  [PrimType.S32]: 's32',
-  [PrimType.Struct]: 'struct',
-  [PrimType.Void]: 'void'
+  [PrimType.U8]: "u8",
+  [PrimType.S8]: "s8",
+  [PrimType.Bool]: "bool",
+  [PrimType.U16]: "u16",
+  [PrimType.S16]: "s16",
+  [PrimType.U32]: "u32",
+  [PrimType.S32]: "s32",
+  [PrimType.Struct]: "struct",
+  [PrimType.Void]: "void"
 }
 
 const STR_TO_PRIM = swap_key_value(PRIM_TO_STR);
@@ -101,7 +101,7 @@ abstract class GameEntry {
   }
 
   sortValue(): number {
-    throw new Error('Unsupported');
+    throw new Error("Unsupported");
   }
 }
 
@@ -122,6 +122,28 @@ class GameVar extends GameEntry {
     const cat = entry[KEY_CAT] as string;
     this.cat = cat ? STR_TO_CAT[cat] : undefined;
     this.enum = entry[KEY_ENUM] as string;
+  }
+
+  /** Returns inner-most part of declaration. */
+  innerDecl(): string {
+    if (!this.declaration) {
+      return "";
+    }
+    let decl = this.declaration!;
+    let i = decl.lastIndexOf("(");
+    if (i !== -1) {
+      i++;
+      const j = decl.indexOf(")", i);
+      decl = decl.slice(i, j);
+    }
+    return decl;
+  }
+
+  isPtr(): boolean {
+    if (!this.declaration) {
+      return false;
+    }
+    return this.innerDecl().startsWith("*");
   }
 
   /** Gets the number of items (1 unless array type) */
@@ -154,25 +176,9 @@ class GameVar extends GameEntry {
 
   /** Gets the physical size of an individual item */
   getSize(structs: GameStructDict): number {
-    let size = this.getSpecSize(structs);
-    if (!this.declaration) {
-      return size;
-    }
-    // get inner-most part of declaration
-    let decl = this.declaration;
-    let i = decl.lastIndexOf('(');
-    if (i !== -1) {
-      i++;
-      const j = decl.indexOf(')');
-      decl = decl.slice(i, j);
-    }
-    // check for pointer
-    if (decl.startsWith('*')) {
-      size = 4;
-      decl = decl.replace(/^\*+/, '');
-    }
+    let size = this.isPtr() ? 4 : this.getSpecSize(structs);
     // check for array
-    const matches = decl.match(/\w+/g);
+    const matches = this.innerDecl().match(/\w+/g);
     if (matches) {
       for (const match of matches) {
         size *= parseInt(match, 16);
