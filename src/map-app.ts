@@ -1,8 +1,8 @@
 import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import {
-  GAMES, MAPS, TableType, REGIONS, KEY_LABEL, KEY_NOTES,
-  KEY_TAGS, getMainTableType, getHideableColumns
+  GAMES, MAPS, TableType, REGIONS, KEY_CAT, KEY_LABEL,
+  KEY_NOTES, getMainTableType, getHideableColumns
 } from './constants'
 import {
   GameEntry, GameData, GameCode, GameStructDict, GameEnumDict, GameStruct, GameEnum, DictEntry
@@ -10,7 +10,7 @@ import {
 import { FilterItem, FilterParser, SearchType } from './filter-parser';
 import "./map-table";
 
-const VERSION = 3;
+const VERSION = 4;
 
 const URL_GAME = 'game';
 const URL_MAP = 'map';
@@ -139,7 +139,7 @@ export class MapApp extends LitElement {
   @property({ type: Array }) filterData: GameEntry[] = [];
   /** mf or zm */
   @property({ type: String }) game = GAMES[0].value;
-  /** U, E, or J */
+  /** U, E, J, or C */
   @property({ type: String }) region = REGIONS[0];
   /** ram, code, data, structs, or enums */
   @property({ type: String }) map = MAPS[0].value;
@@ -150,7 +150,7 @@ export class MapApp extends LitElement {
   private filter: string = '';
   private searchStructs: boolean = false;
   private searchEnums: boolean = false;
-  private hiddenColumns: Set<string> = new Set<string>([KEY_TAGS, KEY_LABEL, KEY_NOTES]);
+  private hiddenColumns: Set<string> = new Set<string>([KEY_CAT, KEY_LABEL, KEY_NOTES]);
   private pageSize: number = 1000;
   private pageIndex: number = 0;
 

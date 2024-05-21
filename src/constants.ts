@@ -53,6 +53,8 @@ export enum TableType {
 export const REGIONS = ['U', 'E', 'J', 'C'];
 
 export const KEY_ADDR = 'addr';
+export const KEY_CAT = 'cat';
+// export const KEY_COMP = 'comp';
 export const KEY_COUNT = 'count';
 export const KEY_DESC = 'desc';
 export const KEY_ENUM = 'enum';
@@ -64,13 +66,13 @@ export const KEY_OFF = 'offset';
 export const KEY_PARAMS = 'params';
 export const KEY_RET = 'return';
 export const KEY_SIZE = 'size';
-export const KEY_TAGS = 'tags';
 export const KEY_TYPE = 'type';
 export const KEY_VAL = 'val';
 export const KEY_VALS = 'vals';
 export const KEY_VARS = 'vars';
 
 const HEAD_ADDR = 'Address';
+const HEAD_CAT = 'Category';
 const HEAD_DESC = 'Description';
 const HEAD_LABEL = 'Label';
 const HEAD_LEN = 'Length';
@@ -79,7 +81,6 @@ const HEAD_OFF = 'Offset';
 const HEAD_PARAMS = 'Arguments';
 const HEAD_RET = 'Returns';
 const HEAD_SIZE = 'Size';
-const HEAD_TAGS = 'Category';
 const HEAD_TYPE = 'Type';
 const HEAD_VAL = 'Value';
 const HEAD_VALS = 'Values';
@@ -87,6 +88,7 @@ const HEAD_VARS = 'Variables';
 
 const HEADINGS: { [key: string]: string } = {
   [KEY_ADDR]: HEAD_ADDR,
+  [KEY_CAT]: HEAD_CAT,
   [KEY_DESC]: HEAD_DESC,
   [KEY_LABEL]: HEAD_LABEL,
   [KEY_LEN]: HEAD_LEN,
@@ -95,7 +97,6 @@ const HEADINGS: { [key: string]: string } = {
   [KEY_PARAMS]: HEAD_PARAMS,
   [KEY_RET]: HEAD_RET,
   [KEY_SIZE]: HEAD_SIZE,
-  [KEY_TAGS]: HEAD_TAGS,
   [KEY_TYPE]: HEAD_TYPE,
   [KEY_VAL]: HEAD_VAL,
   [KEY_VALS]: HEAD_VALS,
@@ -105,18 +106,23 @@ const HEADINGS: { [key: string]: string } = {
 export const CATEGORIES: { [key: string]: string } = {
   'flags': 'Flags',
   'ascii': 'ASCII',
+  'sjis': "Shift JIS",
   'text': 'Text',
-  'rle': 'RLE',
-  'lz': 'LZ',
   'gfx': 'Graphics',
   'tilemap': 'Tilemap',
   'palette': 'Palette',
   'oam_frame': 'OAM frame',
   'bg_blocks': 'BG block map',
   'bg_map': 'BG tilemap',
+  'pcm': 'PCM',
   'thumb': 'THUMB',
-  'arm': 'ARM',
+  'arm': 'ARM'
 };
+
+// export const COMPRESSION: { [key: string]: string } = {
+//   'rle': 'RLE',
+//   'lz': 'LZ'
+// };
 
 export function getMainTableType(map: string): TableType {
   switch(map) {
@@ -141,8 +147,8 @@ export function getHideableColumns(tableType: TableType): { head: string; key: s
         key: KEY_LEN
       },
       {
-        head: HEAD_TAGS,
-        key: KEY_TAGS
+        head: HEAD_CAT,
+        key: KEY_CAT
       },
       {
         head: HEAD_TYPE,
