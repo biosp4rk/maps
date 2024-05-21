@@ -10,7 +10,7 @@ import {
 import { FilterItem, FilterParser, SearchType } from './filter-parser';
 import "./map-table";
 
-const VERSION = 3;
+const VERSION = 4;
 
 const URL_GAME = 'game';
 const URL_MAP = 'map';
