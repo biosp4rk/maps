@@ -348,7 +348,7 @@ export class MapApp extends LitElement {
     const descTerms = desc.split(' ');
     // check description
     if (item.type === SearchType.Term) {
-      if (descTerms.includes(item.text) !== item.exclude) {
+      if (descTerms.some((term) => term.includes(item.text)) !== item.exclude) {
         return true;
       }
     } else if (item.type === SearchType.Quote) {
