@@ -18,8 +18,8 @@
 const ROM_OFFSET = 0x8000000;
 
 export enum SearchType {
-  Term,
-  Quote,
+  Unordered,
+  Ordered,
   Regex,
   AddrEQ,
   AddrGT,
@@ -30,7 +30,6 @@ export enum SearchType {
 }
 
 export class FilterItem {
-
   public text: string;
   public type: SearchType;
   public exclude: boolean;
@@ -44,30 +43,28 @@ export class FilterItem {
     this.addr = null;
     this.regex = null;
   }
-
 }
 
 export class FilterParser {
-
   private static filter: string;
   private static index: number;
   private static items: Array<FilterItem>;
   private static exclude: boolean;
 
   public static parse(filter: string): Array<FilterItem> {
-    // setup
+    // Setup
     this.filter = filter;
     this.initialize();
     
-    // parse
+    // Parse
     this.parseFilterStart();
 
-    // finalize results
+    // Finalize results
     let results: FilterItem[] = [];
     for (const item of this.items) {
       switch (item.type) {
         case SearchType.Regex:
-          // create RegExp objects now (avoid making them on the fly later)
+          // Create RegExp objects now (avoid making them on the fly later)
           item.regex = new RegExp(item.text, 'i');
           break;
         case SearchType.AddrEQ:
@@ -76,18 +73,18 @@ export class FilterParser {
         case SearchType.AddrGE:
         case SearchType.AddrLE:
         case SearchType.AddrNear:
-          // exclude addr filter if not valid hex
+          // Exclude addr filter if not valid hex
           if (!/(0x)?[0-9A-Fa-f]+/.test(item.text)) {
             continue;
           }
           item.addr = parseInt(item.text, 16);
-          // check if virtual rom address
+          // Check if virtual rom address
           if (item.addr >= ROM_OFFSET) {
             item.addr -= ROM_OFFSET;
           }
           break;
         default:
-          // lowercase terms and quotes
+          // Lowercase terms and quotes
           item.text = item.text.toLowerCase();
           break;
       }
@@ -139,33 +136,32 @@ export class FilterParser {
       return false;
     }
     let searchType: SearchType;
-    if (c === "=") {
-      // double equals is also allowed,
-      // so skip second equals if present
-      if (this.filter[this.index] === "=") {
+    if (c === '=') {
+      // Double equals is also allowed, so skip second equals if present
+      if (this.filter[this.index] === '=') {
         this.index++;
       }
       searchType = SearchType.AddrEQ;
-    } else if (c === ">") {
-        if (this.filter[this.index] === "=") {
+    } else if (c === '>') {
+        if (this.filter[this.index] === '=') {
           this.index++;
           searchType = SearchType.AddrGE;
         } else {
           searchType = SearchType.AddrGT;
         }
-    } else if (c === "<") {
-      if (this.filter[this.index] === "=") {
+    } else if (c === '<') {
+      if (this.filter[this.index] === '=') {
         this.index++;
         searchType = SearchType.AddrLE;
       } else {
         searchType = SearchType.AddrLT;
       }
-    } else if (c === "~") {
+    } else if (c === '~') {
         searchType = SearchType.AddrNear;
     } else {
       return false;
     }
-    // add new filter item
+    // Add new filter item
     const item = new FilterItem(searchType, this.exclude);
     this.items.push(item);
     this.parseFilterTerm();
@@ -173,15 +169,15 @@ export class FilterParser {
   }
 
   private static parseFilterNonAddr(c: string): void {
-    // item text is expected, so don't check for minus or space
+    // Item text is expected, so don't check for minus or space
     if (c === '"') {
-      this.items.push(new FilterItem(SearchType.Quote, this.exclude));
+      this.items.push(new FilterItem(SearchType.Ordered, this.exclude));
       this.parseFilterQuote();
     } else if (c === '/') {
       this.items.push(new FilterItem(SearchType.Regex, this.exclude));
       this.parseFilterRegex();
     } else {
-      this.items.push(new FilterItem(SearchType.Term, this.exclude, c));
+      this.items.push(new FilterItem(SearchType.Unordered, this.exclude, c));
       this.parseFilterTerm();
     }
   }
@@ -190,7 +186,7 @@ export class FilterParser {
     if (this.index >= this.filter.length) {
       return
     }
-    // new item is expected, so check for minus but not space
+    // New item is expected, so check for minus but not space
     const c = this.filter[this.index++];
     if (this.tryParseFilterAddr(c)) {
       return;
@@ -207,7 +203,7 @@ export class FilterParser {
     if (this.index >= this.filter.length) {
       return
     }
-    // item text is expected, so don't check for minus or space
+    // Item text is expected, so don't check for minus or space
     const c = this.filter[this.index++];
     if (this.tryParseFilterAddr(c)) {
       return;
@@ -227,7 +223,7 @@ export class FilterParser {
       this.addToLast(c);
     }
     if (!terminated) {
-      // TODO: indicate problem to user
+      // TODO: Indicate problem to user
       this.items.pop();
       return;
     }
@@ -252,7 +248,7 @@ export class FilterParser {
       this.addToLast(c);
     }
     if (!terminated) {
-      // TODO: indicate problem to user
+      // TODO: Indicate problem to user
       this.items.pop();
       return;
     }
@@ -277,5 +273,4 @@ export class FilterParser {
     }
     this.parseFilterSpace();
   }
-
 }

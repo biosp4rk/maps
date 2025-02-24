@@ -23,10 +23,15 @@ custom-elements.json
 /constants.d.ts
 /constants.d.ts.map
 
-/entry-types.js
-/entry-types.js.map
-/entry-types.d.ts
-/entry-types.d.ts.map
+/asset-type.js
+/asset-type.js.map
+/asset-type.d.ts
+/asset-type.d.ts.map
+
+/info-entry.js
+/info-entry.js.map
+/info-entry.d.ts
+/info-entry.d.ts.map
 
 /filter-parser.js
 /filter-parser.js.map
