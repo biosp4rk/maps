@@ -27,7 +27,7 @@ export class MapApp extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      color: white;
+      color: #e8e8e8;
       font-family: verdana, sans-serif;
     }
 
@@ -41,7 +41,7 @@ export class MapApp extends LitElement {
     input,
     select {
       background: black;
-      color: white;
+      color: #e8e8e8;
     }
 
     li {

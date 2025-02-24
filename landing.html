@@ -6,7 +6,7 @@
     <style>
       body {
         background-color: #1a1a1a;
-        color: white;
+        color: #e0e0e0;
         font-family: verdana, sans-serif;
         font-size: 16px;
         margin: 20px;
@@ -15,7 +15,7 @@
         margin: 8px 0px;
       }
       code {
-        background-color: #111;
+        background-color: #333;
         padding: 2px 4px;
       }
       a:link,
@@ -81,14 +81,13 @@
             <li><code>~43788</code> - entry at 0x43788 (if an entry matches) and the entries before and after</li>
           </ul>
         </li>
-        <li>Search for phrases by putting <code>"</code> around the phrase
+        <li>Search for ordered terms by putting <code>"</code> around the terms
           <ul>
-            <li><code>"chozo statue"</code> - entries with the phrase "chozo statue"</li>
+            <li><code>"sprite samus"</code> - entries where "sprite" appears before "samus"</li>
           </ul>
         </li>
         <li>Search for regex patterns by putting <code>/</code> around the pattern
           <ul>
-            <li><code>/sprites?/</code> - entries with "sprite" or "sprites"</li>
             <li><code>/(ridley|kraid)/ statue</code> - entries with "ridley statue" or "kraid statue"</li>
           </ul>
         </li>
