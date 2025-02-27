@@ -12,6 +12,7 @@ import {
 } from './constants';
 
 const grayBorder = css`1px solid #808080`;
+const font = css`Menlo, Monaco, "Courier New", monospace`;
 
 /** Renders a table */
 @customElement('map-table')
@@ -46,26 +47,30 @@ export class MapTable extends LitElement {
 
     .addr,
     .length,
+    .name,
     .offset,
     .size,
     .type,
     .val {
-      font-family: "Courier New", monospace;
-      text-align: right;
-      padding-top: 5px;
-      padding-bottom: 1px;
+      font-family: ${font};
+      padding-top: 4px;
     }
 
-    .type, .inline-type {
-      font-size: 90%;
+    .addr,
+    .length,
+    .offset,
+    .size,
+    .type,
+    .val {
+      text-align: right;
     }
     
     .type {
-      max-width: 300px;
+      max-width: 350px;
     }
 
     .inline-type {
-      font-family: "Courier New", monospace;
+      font-family: ${font};
       margin-right: 3px;
     }
 
@@ -73,6 +78,8 @@ export class MapTable extends LitElement {
       max-width: 350px;
       display: inline-block;
       word-wrap: break-word;
+      color: #9cdcfe;
+      font-family: ${font};
     }
 
     .desc {
@@ -80,6 +87,7 @@ export class MapTable extends LitElement {
     }
     
     .params, .returns {
+      min-width: 150px;
       max-width: 250px;
     }
 
@@ -97,9 +105,8 @@ export class MapTable extends LitElement {
     }
 
     .expand {
-      color: #A0A0E0;
+      color: #a0a0e0;
       cursor: pointer;
-      margin-left: 5px;
     }
 
     .main-table {
@@ -316,40 +323,43 @@ export class MapTable extends LitElement {
     </td>`;
   }
 
-  private renderCodeVarName(cv: VarEntry, paramIdx: number, entryName: string) {
-    const desc = cv.desc ? cv.desc : '';
+  private renderCodeVarName(ve: VarEntry, paramIdx: number, entryName: string) {
+    const isRet = paramIdx === -1;
+    if (isRet && !ve.desc) {
+      return '';
+    }
     let toggle: any = '';
     let noteBox: any = '';
-    if (desc) {
+    if (ve.desc) {
       const key = `${entryName}:${paramIdx}`;
       const expanded = this.expandedItems.has(key);
       toggle = html`<span class="expand" data-expand-key="${key}"
         @click="${this.expand}">[?]</span>`;
       if (expanded) {
-        noteBox = html`<div class="code-var-desc">${desc}</div>`
+        noteBox = html`<div class="code-var-desc">${ve.desc}</div>`
       }
     }
-    return html`<span class="name-span">${cv.name}${toggle}</span>
-      ${noteBox}`;
+    const nameSpan = isRet ? '' : html`<span class="name-span">${ve.name}</span>`;
+    return html`${nameSpan} ${toggle}${noteBox}`;
   }
 
-  private renderCodeVar(cv: VarEntry, paramIdx: number, entryName: string) {
+  private renderCodeVar(ve: VarEntry, paramIdx: number, entryName: string) {
     return html`<div>
-      <span class="inline-type">${cv.typeStr()}</span>
-      ${this.renderCodeVarName(cv, paramIdx, entryName)}
+      <span class="inline-type">${ve.typeStr()}</span>
+      ${this.renderCodeVarName(ve, paramIdx, entryName)}
     </div>`;
   }
 
-  private renderCodeArgs(entry: CodeEntry) {
+  private renderCodeParams(entry: CodeEntry) {
     if (this.hiddenColumns.has(KEY_PARAMS)) {
       return '';
     }
     const params = entry.params;
     if (!params) {
-      return html`<td>void</td>`;
+      return html`<td class="params"><span class="inline-type">void</span></td>`;
     }
     return html`<td class="params">${params.map(
-      (arg, pIdx) => this.renderCodeVar(arg, pIdx, entry.name))}
+      (p, pIdx) => this.renderCodeVar(p, pIdx, entry.name))}
     </td>`;
   }
 
@@ -359,7 +369,7 @@ export class MapTable extends LitElement {
     }
     const ret = entry.return;
     if (!ret) {
-      return html`<td>void</td>`;
+      return html`<td class="returns"><span class="inline-type">void</span></td>`;
     }
     return html`<td class="returns">${this.renderCodeVar(ret, -1, entry.name)}</td>`;
   }
@@ -371,7 +381,7 @@ export class MapTable extends LitElement {
       <td class="name">
         <span class="name-span">${entry.name}</span>
       </td>
-      ${this.renderCodeArgs(entry)}
+      ${this.renderCodeParams(entry)}
       ${this.renderCodeRet(entry)}
       ${this.renderDesc(entry.desc)}
     </tr>`;
