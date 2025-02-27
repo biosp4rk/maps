@@ -52,7 +52,6 @@ export class MapTable extends LitElement {
     .size,
     .type,
     .val {
-      font-family: ${font};
       padding-top: 4px;
     }
 
@@ -62,16 +61,12 @@ export class MapTable extends LitElement {
     .size,
     .type,
     .val {
+      font-family: ${font};
       text-align: right;
     }
     
     .type {
       max-width: 350px;
-    }
-
-    .inline-type {
-      font-family: ${font};
-      margin-right: 3px;
     }
 
     .name-span {
@@ -86,9 +81,17 @@ export class MapTable extends LitElement {
       max-width: 350px;
     }
     
-    .params, .returns {
+    .params {
+      max-width: 350px;
+    }
+
+    .returns {
       min-width: 150px;
       max-width: 250px;
+    }
+
+    .code-var {
+      font-family: ${font};
     }
 
     .code-var-desc {
@@ -107,6 +110,7 @@ export class MapTable extends LitElement {
     .expand {
       color: #a0a0e0;
       cursor: pointer;
+      margin-left: 5px;
     }
 
     .main-table {
@@ -290,7 +294,7 @@ export class MapTable extends LitElement {
   private renderName(entry: InfoEntry) {
     const [toggle, table] = this.renderToggleAndTable(entry);
     return html`<td class="name">
-      <span class="name-span">${entry.name}${toggle}</span>
+      <span class="name-span">${entry.name}</span>${toggle}
       ${table}
     </td>`;
   }
@@ -323,31 +327,23 @@ export class MapTable extends LitElement {
     </td>`;
   }
 
-  private renderCodeVarName(ve: VarEntry, paramIdx: number, entryName: string) {
-    const isRet = paramIdx === -1;
-    if (isRet && !ve.desc) {
-      return '';
+  private renderCodeVar(ve: VarEntry, paramIdx: number, entryName: string) {
+    let codeVar = html`<span class="inline-type">${ve.typeStr()}</span>`;
+    if (paramIdx >= 0) {
+      codeVar = html`${codeVar} <span class="name-span">${ve.name}</span>`
     }
     let toggle: any = '';
-    let noteBox: any = '';
+    let descBox: any = '';
     if (ve.desc) {
       const key = `${entryName}:${paramIdx}`;
       const expanded = this.expandedItems.has(key);
       toggle = html`<span class="expand" data-expand-key="${key}"
         @click="${this.expand}">[?]</span>`;
       if (expanded) {
-        noteBox = html`<div class="code-var-desc">${ve.desc}</div>`
+        descBox = html`<div class="code-var-desc">${ve.desc}</div>`
       }
     }
-    const nameSpan = isRet ? '' : html`<span class="name-span">${ve.name}</span>`;
-    return html`${nameSpan} ${toggle}${noteBox}`;
-  }
-
-  private renderCodeVar(ve: VarEntry, paramIdx: number, entryName: string) {
-    return html`<div>
-      <span class="inline-type">${ve.typeStr()}</span>
-      ${this.renderCodeVarName(ve, paramIdx, entryName)}
-    </div>`;
+    return html`<div><span class="code-var">${codeVar}</span>${toggle}${descBox}</div>`;
   }
 
   private renderCodeParams(entry: CodeEntry) {
@@ -356,7 +352,7 @@ export class MapTable extends LitElement {
     }
     const params = entry.params;
     if (!params) {
-      return html`<td class="params"><span class="inline-type">void</span></td>`;
+      return html`<td class="params"><span class="code-var">void</span></td>`;
     }
     return html`<td class="params">${params.map(
       (p, pIdx) => this.renderCodeVar(p, pIdx, entry.name))}
@@ -369,7 +365,7 @@ export class MapTable extends LitElement {
     }
     const ret = entry.return;
     if (!ret) {
-      return html`<td class="returns"><span class="inline-type">void</span></td>`;
+      return html`<td class="returns"><span class="code-var">void</span></td>`;
     }
     return html`<td class="returns">${this.renderCodeVar(ret, -1, entry.name)}</td>`;
   }
