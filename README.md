@@ -8,7 +8,6 @@ Source code for app at [labk.org/maps](https://labk.org/maps/)
 - Search for addresses by putting `=` before a hex address
 - Search for address ranges by putting `>`, `<`, `>=`, or `<=` before a hex address
 - Search for entries near an address by putting `~` before a hex address
-- Search for ordered terms by putting `"` around the terms
 - Search for regex patterns by putting `/` around the pattern
 - Put `-` before a term, ordered terms, or pattern to exclude it from the results
 - Clear a filter by pressing `esc`
@@ -26,8 +25,6 @@ Source code for app at [labk.org/maps](https://labk.org/maps/)
   - Entries that contain both "samus" and "sprite"
 - `samus -sprite`
   - Entries that contain "samus" but not "sprite"
-- `"samus sprite"`
-  - Entries where "samus" appears before "sprite"
 - `/chozo (statue|ball)/`
   - Entries that contain "chozo statue" or "chozo ball"
 

@@ -101,6 +101,10 @@ export class MapTable extends LitElement {
       margin: 5px 0px 2px 0px;
     }
 
+    .highlight {
+      background-color: #f0800080;
+    }
+
     .has-tooltip {
       cursor: help;
       text-decoration: underline dotted;
@@ -140,6 +144,8 @@ export class MapTable extends LitElement {
   @property({ type: Number }) parentAddr = NaN;
   /** Columns that should not be displayed */
   @property({ type: Object }) hiddenColumns: Set<string> = new Set<string>();
+  /** Regex that matches the text to highlight */
+  @property({ type: Object }) highlightRegex: RegExp | null = null;
 
   /** Indexes of rows that are expanded */
   private expandedItems: Set<string> = new Set<string>();
@@ -291,11 +297,39 @@ export class MapTable extends LitElement {
     return [toggle, table];
   }
 
-  private renderName(entry: InfoEntry) {
-    const [toggle, table] = this.renderToggleAndTable(entry);
+  private renderNameInner(name: string) {
+    if (this.highlightRegex === null) {
+      return html`${name}`;
+    }
+    let inner = html``;
+    let idx = 0;
+    let match;
+    while ((match = this.highlightRegex.exec(name)) !== null) {
+      const matchIdx = match.index;
+      if (matchIdx > idx) {
+        inner = html`${inner}${name.slice(idx, matchIdx)}`
+      }
+      inner = html`${inner}<span class="highlight">${match[0]}</span>`
+      idx = matchIdx + match[0].length;
+    }
+    if (idx < name.length) {
+      inner = html`${inner}${name.slice(idx)}`
+    }
+    return inner;
+  }
+
+  private renderName(entry: InfoEntry, canHaveSubTable: boolean) {
+    const inner = this.renderNameInner(entry.name);
+    let toggle, table;
+    if (canHaveSubTable) {
+      [toggle, table] = this.renderToggleAndTable(entry);
+    }
+    else {
+      toggle = '';
+      table = '';
+    }
     return html`<td class="name">
-      <span class="name-span">${entry.name}</span>${toggle}
-      ${table}
+      <span class="name-span">${inner}</span>${toggle}${table}
     </td>`;
   }
 
@@ -312,7 +346,7 @@ export class MapTable extends LitElement {
       ${this.renderVarLength(entry)}
       ${this.renderCat(entry.catStr())}
       ${this.renderType(entry.typeStr())}
-      ${this.renderName(entry)}
+      ${this.renderName(entry, true)}
       ${this.renderDesc(entry.desc)}
     </tr>`;
   }
@@ -374,9 +408,7 @@ export class MapTable extends LitElement {
     return html`<tr>
       <td class="addr">${toHex(entry.addr)}</td>
       ${this.renderCodeLength(entry)}
-      <td class="name">
-        <span class="name-span">${entry.name}</span>
-      </td>
+      ${this.renderName(entry, true)}
       ${this.renderCodeParams(entry)}
       ${this.renderCodeRet(entry)}
       ${this.renderDesc(entry.desc)}
@@ -395,9 +427,7 @@ export class MapTable extends LitElement {
     const vars = html`<td class="vars">${toggle}${table}</td>`;
     return html`<tr>
       ${this.renderStructSize(entry.size)}
-      <td class="name">
-        <span class="name-span">${entry.name}</span>
-      </td>
+      ${this.renderName(entry, false)}
       ${vars}
       ${this.renderDesc(entry.desc)}
     </tr>`;
@@ -407,9 +437,7 @@ export class MapTable extends LitElement {
     const [toggle, table] = this.renderToggleAndTable(entry);
     const vals = html`<td class="vals">${toggle}${table}</td>`;
     return html`<tr>
-      <td class="name">
-        <span class="name-span">${entry.name}</span>
-      </td>
+      ${this.renderName(entry, false)}
       ${vals}
       ${this.renderDesc(entry.desc)}
     </tr>`;
@@ -425,7 +453,7 @@ export class MapTable extends LitElement {
       </td>
       ${this.renderVarLength(entry)}
       ${this.renderType(entry.typeStr())}
-      ${this.renderName(entry)}
+      ${this.renderName(entry, true)}
       ${this.renderDesc(entry.desc)}
     </tr>`;
   }

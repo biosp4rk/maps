@@ -3,11 +3,11 @@ import { property, customElement } from 'lit/decorators.js';
 import {
   GAMES, MAPS, TableType, REGIONS, KEY_CAT, KEY_NAME, KEY_DESC,
   getMainTableType, getHideableColumns
-} from './constants'
+} from './constants';
 import {
   InfoEntry, DataEntry, CodeEntry, StructEntryDict, EnumEntryDict, StructEntry, EnumEntry, DictEntry
 } from './info-entry';
-import { FilterItem, FilterParser, SearchType } from './filter-parser';
+import { FilterItem, FilterParser, FilterType } from './filter-parser';
 import "./map-table";
 
 const VERSION = 4;
@@ -148,6 +148,7 @@ export class MapApp extends LitElement {
 
   private tableType: TableType = getMainTableType(this.map);
   private filter: string = '';
+  private filterItems: FilterItem[] = [];
   private searchStructs: boolean = false;
   private searchEnums: boolean = false;
   private hiddenColumns: Set<string> = new Set<string>([KEY_CAT, KEY_DESC]);
@@ -344,26 +345,11 @@ export class MapApp extends LitElement {
     enm: string = ''
   ): boolean {
     name = name.toLowerCase();
-    if (item.type === SearchType.Unordered) {
-      if (name.includes(item.text) !== item.exclude) {
+    if (item.type === FilterType.Term) {
+      if (name.includes(item.term) !== item.exclude) {
         return true;
       }
-    } else if (item.type === SearchType.Ordered) {
-      const terms = item.text.split(' ');
-      let idx = 0;
-      let match = true;
-      for (const term of terms) {
-        const nextIdx = name.indexOf(term, idx);
-        if (nextIdx === -1) {
-          match = false;
-          break;
-        }
-        idx = nextIdx + term.length;
-      }
-      if (match !== item.exclude) {
-        return true;
-      }
-    } else if (item.type === SearchType.Regex) {
+    } else if (item.type === FilterType.Regex) {
       if (item.regex!.test(name) !== item.exclude) {
         return true;
       }
@@ -390,27 +376,27 @@ export class MapApp extends LitElement {
 
   private checkAddrFilter(addr: number, item: FilterItem): boolean {
     switch (item.type) {
-      case SearchType.AddrEQ:
+      case FilterType.AddrEQ:
         if ((addr === item.addr!) !== item.exclude) {
           return true;
         }
         break;
-      case SearchType.AddrGT:
+      case FilterType.AddrGT:
         if ((addr > item.addr!) !== item.exclude) {
           return true;
         }
         break;
-      case SearchType.AddrLT:
+      case FilterType.AddrLT:
         if ((addr < item.addr!) !== item.exclude) {
           return true;
         }
         break;
-      case SearchType.AddrGE:
+      case FilterType.AddrGE:
         if ((addr >= item.addr!) !== item.exclude) {
           return true;
         }
         break;
-      case SearchType.AddrLE:
+      case FilterType.AddrLE:
         if ((addr <= item.addr!) !== item.exclude) {
           return true;
         }
@@ -459,18 +445,28 @@ export class MapApp extends LitElement {
     this.filterData = this.filterData.slice(left, right + 1);
   }
 
+  private getHighlightRegex(): RegExp | null {
+    const highlightItems = this.filterItems.filter(
+      item =>
+        (item.type === FilterType.Term || item.type === FilterType.Regex) &&
+        !item.exclude);
+    if (highlightItems.length === 0) {
+      return null;
+    }
+    return new RegExp(highlightItems.map(i => i.term).join('|'), 'gi');
+  }
+
   private applyFilter() {
     // Parse to get filter items
-    const items = FilterParser.parse(this.filter);
+    this.filterItems = FilterParser.parse(this.filter);
     this.pageIndex = 0;
 
     // Check each filter item
     this.filterData = this.allData;
-    for (const item of items) {
+    for (const item of this.filterItems) {
       switch (item.type) {
-        case SearchType.Unordered:
-        case SearchType.Ordered:
-        case SearchType.Regex:
+        case FilterType.Term:
+        case FilterType.Regex:
           this.filterData = this.filterData.filter(entry => {
             let sName = undefined;
             let eName = undefined;
@@ -492,11 +488,11 @@ export class MapApp extends LitElement {
             return this.checkNameFilter(entry.name, item, sName, eName);
           });
           break;
-        case SearchType.AddrEQ:
-        case SearchType.AddrGT:
-        case SearchType.AddrLT:
-        case SearchType.AddrGE:
-        case SearchType.AddrLE:
+        case FilterType.AddrEQ:
+        case FilterType.AddrGT:
+        case FilterType.AddrLT:
+        case FilterType.AddrGE:
+        case FilterType.AddrLE:
           if (this.tableHasAddr()) {
             this.filterData = this.filterData.filter(entry => {
               return this.checkAddrFilter(entry.sortValue(), item);
@@ -505,7 +501,7 @@ export class MapApp extends LitElement {
             this.filterData = [];
           }
           break;
-        case SearchType.AddrNear:
+        case FilterType.AddrNear:
           if (this.tableHasAddr()) {
             this.handleNearAddrFilter(item);
           } else {
@@ -531,6 +527,7 @@ export class MapApp extends LitElement {
 
   private clearFilter() {
     this.filter = '';
+    this.filterItems = [];
     this.setFilterText('');
     this.setUrlParams();
   }
@@ -647,12 +644,14 @@ export class MapApp extends LitElement {
     }
     const firstRow = this.pageIndex * this.pageSize;
     const lastRow = firstRow + this.pageSize;
+    const highlightRegex = this.getHighlightRegex();
     return html`<map-table
       .tableType="${this.tableType}"
       .entries="${this.filterData.slice(firstRow, lastRow)}"
       .structs="${this.structs}"
       .enums="${this.enums}"
-      .hiddenColumns="${this.hiddenColumns}">
+      .hiddenColumns="${this.hiddenColumns}"
+      .highlightRegex="${highlightRegex}">
     </map-table>`;
   }
 
