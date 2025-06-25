@@ -1,14 +1,16 @@
 import { LitElement, html, css } from 'lit';
-import { property, customElement } from 'lit/decorators.js';
+import { state, customElement } from 'lit/decorators.js';
 import {
   GAMES, MAPS, TableType, REGIONS, KEY_CAT, KEY_NAME, KEY_DESC,
   getMainTableType, getHideableColumns
 } from './constants';
 import {
-  InfoEntry, DataEntry, CodeEntry, StructEntryDict, EnumEntryDict, StructEntry, EnumEntry, DictEntry
+  DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
+  DataEntry, CodeEntry,  StructEntry, UnionEntry, EnumEntry, TypedefEntry
 } from './info-entry';
 import { FilterItem, FilterParser, FilterType } from './filter-parser';
 import "./map-table";
+import { ArrayType, AssetType, FunctionType, PointerType, SpecifierType, TypeSpecKind } from './asset-type';
 
 const VERSION = 4;
 
@@ -18,8 +20,16 @@ const URL_REGION = 'region';
 const URL_FILTER = 'filter';
 const URL_OPTIONS = 'options';
 
-const OPT_STRUCTS = 's';
+const OPT_STRUCTS_UNIONS = 's';
 const OPT_ENUMS = 'e';
+
+const BUILT_IN_SIZES: { [key: string]: number } = {
+  ["char"]: 1,
+  ["short"]: 2,
+  ["int"]: 4,
+  ["float"]: 4,
+  ["double"]: 8
+};
 
 /** Renders the application */
 @customElement('map-app')
@@ -112,8 +122,9 @@ export class MapApp extends LitElement {
     }
 
     #page-nav {
-      grid-column: 1 / 3;
-      grid-row: 3;
+      /* grid-column: 1 / 3;
+      grid-row: 3; */
+      padding-bottom: 10px;
       text-align: center;
     }
     #num-rows {
@@ -125,31 +136,46 @@ export class MapApp extends LitElement {
 
     #column-vis {
       grid-column: 4;
-      grid-row: 1 / 5;
+      grid-row: 1 / 4;
     }
   `;
 
-  /** game struct definitions */
-  @property({ type: Object }) structs: StructEntryDict = {};
-  /** game enum definitions */
-  @property({ type: Object }) enums: EnumEntryDict = {};
-  /** all map data for game and region */
-  @property({ type: Array }) allData: InfoEntry[] = [];
-  /** filtered map data to display */
-  @property({ type: Array }) filterData: InfoEntry[] = [];
+  // Internal reactive state
+  /** Filtered map data to display */
+  @state()
+  private filterData: NamedEntry[] = [];
   /** mf or zm */
-  @property({ type: String }) game = GAMES[0].value;
+  @state()
+  private game = GAMES[0].value;
   /** U, E, J, or C */
-  @property({ type: String }) region = REGIONS[0];
+  @state()
+  private region = REGIONS[0];
   /** ram, code, data, structs, or enums */
-  @property({ type: String }) map = MAPS[0].value;
-  /** hide table while fetching data */
-  @property({ type: Boolean }) fetchingData = false;
+  @state()
+  private map = MAPS[0].value;
+  /** Hide table while fetching data */
+  @state()
+  private fetchingData = false;
 
+  // Data fields
+  /** All struct definitions in the game */
+  private structs: StructEntryDict = {};
+  /** All union definitions in the game */
+  private unions: UnionEntryDict = {};
+  /** All enum definitions in the game */
+  private enums: EnumEntryDict = {};
+  /** All typedefs in the game */
+  private typedefs: TypedefEntryDict = {};
+  /** Sizes of structs, unions, and typedefs */
+  private sizes: { [key: string]: number } = {};
+  /** All map data for game and region */
+  private allData: NamedEntry[] = [];
+
+  // UI fields
   private tableType: TableType = getMainTableType(this.map);
   private filter: string = '';
   private filterItems: FilterItem[] = [];
-  private searchStructs: boolean = false;
+  private searchStructsUnions: boolean = false;
   private searchEnums: boolean = false;
   private hiddenColumns: Set<string> = new Set<string>([KEY_CAT, KEY_DESC]);
   private pageSize: number = 1000;
@@ -158,7 +184,7 @@ export class MapApp extends LitElement {
   constructor() {
     super();
     this.parseUrlParams();
-    this.fetchData(true, false);
+    this.fetchData(true, true, false);
     document.body.addEventListener('keyup', (e: Event) => {
       if ((e as KeyboardEvent).key == 'Escape') {
         this.resetFilter();
@@ -194,7 +220,7 @@ export class MapApp extends LitElement {
     const optStr = params.get(URL_OPTIONS);
     if (optStr) {
       const opts = optStr.split(',');
-      this.searchStructs = opts.includes(OPT_STRUCTS)
+      this.searchStructsUnions = opts.includes(OPT_STRUCTS_UNIONS)
       this.searchEnums = opts.includes(OPT_ENUMS)
     }
   }
@@ -209,7 +235,7 @@ export class MapApp extends LitElement {
     }
     // Check options
     const opts = [];
-    if (this.searchStructs) { opts.push(OPT_STRUCTS); }
+    if (this.searchStructsUnions) { opts.push(OPT_STRUCTS_UNIONS); }
     if (this.searchEnums) { opts.push(OPT_ENUMS); }
     if (opts.length > 0) {
       params.set(URL_OPTIONS, opts.join(','));
@@ -251,7 +277,7 @@ export class MapApp extends LitElement {
     return baseUrl + fileName + ver;
   }
 
-  async fetchData(first: boolean, keepFilter: boolean) {
+  async fetchData(first: boolean, gameChanged: boolean, keepFilter: boolean) {
     if (!this.game || !this.region || !this.map) {
       return;
     }
@@ -262,28 +288,72 @@ export class MapApp extends LitElement {
 
     // Read data from json files
     this.fetchingData = true;
+    const promises = [];
+    let structProm: Promise<any>;
+    let unionProm: Promise<any>;
+    let enumProm: Promise<any>;
+    let typedefsProm: Promise<any>;
+    let dataProm: Promise<any>;
 
-    // Get enums
-    const enumList = await fetch(this.getJsonUrl('enums'))
-      .then(response => response.json());
-    this.enums = {};
-    for (const entry of enumList) {
-      this.enums[entry[KEY_NAME]] = new EnumEntry(entry)
+    if (first || gameChanged) {
+      structProm = fetch(this.getJsonUrl('structs'));
+      unionProm = fetch(this.getJsonUrl('unions'));
+      enumProm = fetch(this.getJsonUrl('enums'));
+      typedefsProm = fetch(this.getJsonUrl('typedefs'));
+      promises.push(structProm, unionProm, enumProm, typedefsProm);
     }
 
-    // Get structs
-    const structList = await fetch(this.getJsonUrl('structs'))
-      .then(response => response.json());
-    this.structs = {};
-    for (const entry of structList) {
-      this.structs[entry[KEY_NAME]] = new StructEntry(entry)
+    if (this.tableHasAddr()) {
+      dataProm = fetch(this.getJsonUrl(this.map));
+      promises.push(dataProm);
+    }
+
+    const responses = await Promise.all(promises);
+    const jsons = await Promise.all(responses.map(r => r.json()));
+
+    if (first || gameChanged) {
+      const [structJson, unionJson, enumJson, typedefJson] = jsons;
+
+      // Get structs
+      this.structs = {};
+      for (const entry of structJson) {
+        this.structs[entry[KEY_NAME]] = new StructEntry(entry)
+      }
+      // Get unions
+      this.unions = {};
+      for (const entry of unionJson) {
+        this.unions[entry[KEY_NAME]] = new UnionEntry(entry)
+      }
+      // Get enums
+      this.enums = {};
+      for (const entry of enumJson) {
+        this.enums[entry[KEY_NAME]] = new EnumEntry(entry)
+      }
+      // Get typedefs
+      this.typedefs = {};
+      for (const entry of typedefJson) {
+        this.typedefs[entry[KEY_NAME]] = new TypedefEntry(entry);
+      }
+
+      // Compute sizes
+      this.sizes = {};
+      for (const entry of Object.values(this.structs)) {
+        this.sizes[entry.name] = entry.size;
+      }
+      for (const entry of Object.values(this.unions)) {
+        this.sizes[entry.name] = entry.size;
+      }
+      for (const entry of Object.values(this.typedefs)) {
+        if (!(entry.name in this.sizes)) {
+          this.sizes[entry.name] = this.typeSize(entry.type);
+        }
+      }
     }
 
     // Get map data
     if (this.tableHasAddr()) {
       // Ram, code, or data
-      let fullData: DictEntry[] = await fetch(this.getJsonUrl(this.map))
-        .then(response => response.json());
+      let fullData: DictEntry[] = jsons.pop();
       // Filter by region
       fullData.forEach(entry => this.getRegionEntry(entry));
       fullData = fullData.filter(entry => entry.addr !== null);
@@ -294,8 +364,24 @@ export class MapApp extends LitElement {
         this.allData = fullData.map(entry => new DataEntry(entry));
       }
     } else {
-      // Structs or enums
-      const entries = this.tableIs(TableType.StructList) ? this.structs : this.enums;
+      // Structs, unions, enums, or typedefs
+      let entries;
+      switch (this.tableType) {
+        case TableType.StructList:
+          entries = this.structs;
+          break;
+        case TableType.UnionList:
+          entries = this.unions;
+          break;
+        case TableType.EnumList:
+          entries = this.enums;
+          break;
+        case TableType.TypedefList:
+          entries = this.typedefs;
+          break;
+        default:
+          throw new Error(`Invalid table type ${this.tableType}`);
+      }
       this.allData = Object.values(entries).sort((a, b) => {
         if (a < b) { return -1; }
         if (a > b) { return 1; }
@@ -315,6 +401,55 @@ export class MapApp extends LitElement {
     }
 
     this.fetchingData = false;
+  }
+
+  /** Computes the size of types for the purpose of storing typedef sizes */
+  private typeSize(type: AssetType): number {
+    if (type instanceof SpecifierType) {
+      const name = type.specName();
+      switch (type.kind) {
+        case TypeSpecKind.BuiltIn:
+          if (type.names.includes("long")) {
+            return 8;
+          }
+          const size = BUILT_IN_SIZES[name];
+          if (size !== undefined) {
+            return size;
+          }
+          return 4; // int by default
+        case TypeSpecKind.Typedef:
+          const td = this.typedefs[name];
+          if (td !== undefined) {
+            let size = this.sizes[td.name];
+            if (size === undefined) {
+              size = this.typeSize(td.type);
+              this.sizes[td.name] = size;
+            }
+            return size;
+          } else {
+            throw new Error(`Unrecognized typedef name ${name}`);
+          }
+        case TypeSpecKind.Struct:
+          return this.sizes[name];
+        case TypeSpecKind.Union:
+          return this.sizes[name];
+        case TypeSpecKind.Enum:
+          throw new Error(`Can't compute size of enum`);
+        default:
+          throw new Error(TypeSpecKind[type.kind]);
+      }
+    } else if (type instanceof ArrayType) {
+      if (type.size === undefined) {
+        return 0; // Treat 0 as unknown
+      }
+      return type.size * this.typeSize(type.innerType);
+    } else if (type instanceof PointerType) {
+      return 4;
+    } else if (type instanceof FunctionType) {
+      throw new Error('Function types must be pointer');
+    } else {
+      throw new Error(`Invalid type ${typeof(type)}`);
+    }
   }
 
   private inputHandler(e: Event) {
@@ -341,8 +476,8 @@ export class MapApp extends LitElement {
   private checkNameFilter(
     name: string,
     item: FilterItem,
-    structName: string = '',
-    enm: string = ''
+    structUnionName: string = '',
+    enumName: string = ''
   ): boolean {
     name = name.toLowerCase();
     if (item.type === FilterType.Term) {
@@ -354,18 +489,27 @@ export class MapApp extends LitElement {
         return true;
       }
     }
-    // Check if entry is struct
-    if (this.searchStructs && structName && structName in this.structs) {
-      const es = this.structs[structName];
-      if (es.vars.some(
-        rv => this.checkNameFilter(rv.name, item, rv.structName, rv.enum))
-      ) {
-        return true;
+    // Check if entry is struct or union
+    if (this.searchStructsUnions && structUnionName) {
+      if (structUnionName in this.structs) {
+        const se = this.structs[structUnionName];
+        if (se.vars.some(
+          sv => this.checkNameFilter(sv.name, item, sv.specName(), sv.enum))
+        ) {
+          return true;
+        }
+      } else if (structUnionName in this.unions) {
+        const ue = this.unions[structUnionName];
+        if (ue.vars.some(
+          uv => this.checkNameFilter(uv.name, item, uv.specName(), uv.enum))
+        ) {
+          return true;
+        }
       }
     }
     // Check if entry has enum
-    if (this.searchEnums && enm && enm in this.enums) {
-      const ee = this.enums[enm].vals;
+    if (this.searchEnums && enumName && enumName in this.enums) {
+      const ee = this.enums[enumName].vals;
       if (ee.some(ev => this.checkNameFilter(ev.name, item))) {
         return true;
       }
@@ -427,7 +571,7 @@ export class MapApp extends LitElement {
       } else {
         const de = entry as DataEntry;
         addr = de.addr;
-        size = de.getLength(this.structs);
+        size = de.getLength(this.sizes);
       }
       if (target >= addr && target < addr + size) {
         exact = true;
@@ -468,24 +612,25 @@ export class MapApp extends LitElement {
         case FilterType.Term:
         case FilterType.Regex:
           this.filterData = this.filterData.filter(entry => {
-            let sName = undefined;
+            let suName = undefined;
             let eName = undefined;
             if (this.tableIs(TableType.RamList, TableType.DataList)) {
               const de = entry as DataEntry;
-              if (this.searchStructs) {
-                sName = de.structName;
+              if (this.searchStructsUnions &&
+                (de.specKind === TypeSpecKind.Struct || de.specKind === TypeSpecKind.Union)) {
+                suName = de.specName();
               }
               if (this.searchEnums) {
                 eName = de.enum;
               }
-            } else if (this.tableIs(TableType.StructList) && this.searchStructs) {
+            } else if (this.tableIs(TableType.StructList) && this.searchStructsUnions) {
               const se = entry as StructEntry;
-              sName = se.name;
+              suName = se.name;
             } else if (this.tableIs(TableType.EnumList) && this.searchEnums) {
               const ee = entry as EnumEntry;
               eName = ee.name;
             }
-            return this.checkNameFilter(entry.name, item, sName, eName);
+            return this.checkNameFilter(entry.name, item, suName, eName);
           });
           break;
         case FilterType.AddrEQ:
@@ -546,7 +691,7 @@ export class MapApp extends LitElement {
 
   private structsChangeHandler() {
     const cb = this.shadowRoot?.querySelector('#filter-structs') as HTMLInputElement;
-    this.searchStructs = cb.checked;
+    this.searchStructsUnions = cb.checked;
   }
 
   private enumsChangeHandler() {
@@ -558,14 +703,14 @@ export class MapApp extends LitElement {
     this.game =
       (this.shadowRoot!.querySelector('#game-select')! as HTMLInputElement)
         .value;
-    this.fetchData(false, false);
+    this.fetchData(false, true, false);
   }
 
   private regionChangeHandler() {
     this.region =
       (this.shadowRoot!.querySelector('#region-select')! as HTMLInputElement)
         .value;
-    this.fetchData(false, true);
+    this.fetchData(false, false, true);
   }
 
   private mapChangeHandler() {
@@ -573,7 +718,7 @@ export class MapApp extends LitElement {
       (this.shadowRoot!.querySelector('#map-select')! as HTMLInputElement)
         .value;
     this.setMapType(map);
-    this.fetchData(false, false);
+    this.fetchData(false, false, false);
   }
 
   private setMapType(map: string) {
@@ -649,7 +794,9 @@ export class MapApp extends LitElement {
       .tableType="${this.tableType}"
       .entries="${this.filterData.slice(firstRow, lastRow)}"
       .structs="${this.structs}"
+      .unions="${this.unions}"
       .enums="${this.enums}"
+      .sizes="${this.sizes}"
       .hiddenColumns="${this.hiddenColumns}"
       .highlightRegex="${highlightRegex}">
     </map-table>`;
@@ -684,11 +831,11 @@ export class MapApp extends LitElement {
               </div>
             </div>
             <ul id="filter-options" class="checkbox-list">
-              <li title="Include struct info when filtering">
+              <li title="Include struct/union info when filtering">
                 <input type="checkbox" id="filter-structs"
-                  .checked=${this.searchStructs}
+                  .checked=${this.searchStructsUnions}
                   @change='${this.structsChangeHandler}'>
-                <label for="filter-structs">Structs</label>
+                <label for="filter-structs">Structs/Unions</label>
               </li>
               <li title="Include enum info when filtering">
                 <input type="checkbox" id="filter-enums"
@@ -697,7 +844,6 @@ export class MapApp extends LitElement {
                 <label for="filter-enums">Enums</label>
               </li>
             </ul>
-            ${this.renderPageNav()}
             <ul id="column-vis" class="checkbox-list">
               ${getHideableColumns(this.tableType).map(
                 col => html`<li>
@@ -708,6 +854,7 @@ export class MapApp extends LitElement {
               </li>`)}
             </ul>
           </div>
+          ${this.renderPageNav()}
         </div>
         ${this.renderTable()}
       </div>`;

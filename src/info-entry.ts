@@ -1,35 +1,31 @@
 export {
-  InfoEntry, VarEntry, StructVarEntry, DataEntry, CodeEntry,
-  StructEntry, EnumValEntry, EnumEntry, StructEntryDict, EnumEntryDict
+  DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
+  InfoEntry, VarEntry, NamedVarEntry, DataEntry, CodeEntry, StructVarEntry,
+  StructEntry, UnionEntry, EnumValEntry, EnumEntry, TypedefEntry
 };
 import { toHex } from './utils';
 import {
-  KEY_ADDR, KEY_CAT, KEY_COUNT, KEY_DESC, KEY_ENUM, KEY_MODE, KEY_NAME,
-  KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TYPE, KEY_VAL
+  KEY_ADDR, KEY_BITS, KEY_CAT, KEY_COUNT, KEY_DESC, KEY_ENUM, KEY_LOC, KEY_MODE,
+  KEY_NAME, KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TYPE, KEY_VAL, KEY_VALS, KEY_VARS
 } from './constants';
 import {
-  SpecifierType, TaggedType, OuterType, ArrayType,
-  FunctionType, TypeTokenizer, TypeParser, PointerType
+  BUILT_IN_SIZES, TypeSpecKind, AssetType, SpecifierType, OuterType,
+  ArrayType, FunctionType, TypeTokenizer, TypeParser, PointerType
 } from './asset-type';
 
-export type DictEntry = {[key: string]: unknown};
+type DictEntry = {[key: string]: unknown};
+type NamedEntry = NamedVarEntry | CodeEntry | StructEntry | UnionEntry | EnumEntry | TypedefEntry;
+type StructEntryDict = { [key: string]: StructEntry };
+type UnionEntryDict = { [key: string]: UnionEntry };
+type EnumEntryDict = { [key: string]: EnumEntry };
+type TypedefEntryDict = { [key: string]: TypedefEntry };
 
 function swap_key_value(obj: any): any {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [v, k]));
 }
 
-export enum DataType {
-  Void,
-  U8,
-  S8,
-  U16,
-  S16,
-  U32,
-  S32,
-  Struct
-}
-
 enum Category {
+  Bool,
   Flags,
   Ascii,
   Text,
@@ -37,8 +33,8 @@ enum Category {
   Tilemap,
   Palette,
   OamFrame,
-  BGBlocks,
-  BGMap,
+  BgBlocks,
+  BgMap,
   Pcm,
   Thumb,
   Arm
@@ -52,8 +48,8 @@ const CAT_TO_STR = {
   [Category.Tilemap]: 'tilemap',
   [Category.Palette]: 'palette',
   [Category.OamFrame]: 'oam_frame',
-  [Category.BGBlocks]: 'bg_blocks',
-  [Category.BGMap]: 'bg_map',
+  [Category.BgBlocks]: 'bg_blocks',
+  [Category.BgMap]: 'bg_map',
   [Category.Pcm]: 'pcm',
   [Category.Thumb]: 'thumb',
   [Category.Arm]: 'arm'
@@ -78,12 +74,13 @@ const MODE_TO_STR = {
 
 const STR_TO_MODE = swap_key_value(MODE_TO_STR);
 
+const TOKENIZER = new TypeTokenizer();
+const PARSER = new TypeParser();
+
 abstract class InfoEntry {
-  name!: string;
   desc?: string;
 
   constructor(entry: DictEntry) {
-    this.name = entry[KEY_NAME] as string;
     this.desc = entry[KEY_DESC] as string;
   }
 
@@ -93,28 +90,25 @@ abstract class InfoEntry {
 }
 
 class VarEntry extends InfoEntry {
-  arrCount?: number;
   decl!: string;
-  cat?: Category;
-  enum?: string;
-  // Type related
-  baseType!: DataType;
-  structName?: string;
+  specNames!: string[];
+  specKind!: TypeSpecKind;
   isPtr!: boolean;
   innerCount!: number;
-
-  static tokenizer = new TypeTokenizer();
-  static parser = new TypeParser();
+  arrCount?: number;
+  cat?: Category;
+  //comp?: Compression;
+  enum?: string;
 
   constructor(entry: DictEntry) {
     super(entry);
     this.decl = entry[KEY_TYPE] as string;
+    this.parseType();
     const arrCount = entry[KEY_COUNT] as string;
-    this.arrCount = arrCount ? parseInt(arrCount) : undefined;
+    this.arrCount = arrCount !== undefined ? parseInt(arrCount) : undefined;
     const cat = entry[KEY_CAT] as string;
     this.cat = cat ? STR_TO_CAT[cat] : undefined;
     this.enum = entry[KEY_ENUM] as string;
-    this.parseType();
   }
 
   /** Gets the number of items (1 unless array type) */
@@ -122,54 +116,57 @@ class VarEntry extends InfoEntry {
     return this.arrCount ?? 1;
   }
 
-  getSpecSize(structs: StructEntryDict) : number {
-    switch (+this.baseType) {
-      case DataType.U8:
-      case DataType.S8:
-        return 1;
-      case DataType.U16:
-      case DataType.S16:
-        return 2
-      case DataType.U32:
-      case DataType.S32:
-        return 4;
-      case DataType.Struct:
-        const se = structs[this.structName!];
-        if (se === undefined) {
-          throw new Error(`Invalid struct name ${this.structName}`);
+  getSpecSize(sizes: { [key: string]: number }) : number {
+    switch (this.specKind) {
+      case TypeSpecKind.BuiltIn:
+        if (this.specNames.includes("long")) {
+          return 8;
         }
-        return se.size;
+        const size1 = BUILT_IN_SIZES[this.specName()];
+        if (size1 !== undefined) {
+          return size1;
+        }
+        return 4; // int by default
+      case TypeSpecKind.Typedef:
+      case TypeSpecKind.Struct:
+      case TypeSpecKind.Union:
+        const size2 = sizes[this.specName()];
+        if (size2 !== undefined) {
+          return size2;
+        }
+        const ks = TypeSpecKind[this.specKind];
+        throw new Error(`Invalid ${ks} name ${this.specName()}`);
+      case TypeSpecKind.Enum:
+        throw new Error('Cannot compute size of enum');
       default:
-        throw new Error('Invalid data type');
+        throw new Error(TypeSpecKind[this.specKind]);
     }
   }
 
   /** Gets the physical size of an individual item */
-  getSize(structs: StructEntryDict): number {
-    let size = this.isPtr ? 4 : this.getSpecSize(structs);
+  getSize(sizes: { [key: string]: number }): number {
+    let size = this.isPtr ? 4 : this.getSpecSize(sizes);
     return size * this.innerCount;
   }
 
   /** Gets the total physical size of all items */
-  getLength(structs: StructEntryDict): number {
-    return this.getCount() * this.getSize(structs);
+  getLength(sizes: { [key: string]: number }): number {
+    return this.getCount() * this.getSize(sizes);
   }
 
   /** Returns the item size and count if count > 1 */
-  getLengthToolTip(structs: StructEntryDict): string {
-    const count = this.getCount();
-    if (count == 1) {
+  getLengthToolTip(sizes: { [key: string]: number }): string {
+    if (this.arrCount === undefined) {
       return '';
     }
-    const size = this.getSize(structs);
-    return 'Size: ' + toHex(size) + '\nCount: ' + toHex(count);
+    const size = this.getSize(sizes);
+    const count = this.getCount();
+    const countStr = count !== 0 ? toHex(count) : '?';
+    return 'Size: ' + toHex(size) + '\nCount: ' + countStr;
   }
-  
+
   specName(): string {
-    if (this.baseType === DataType.Struct) {
-      return this.structName!;
-    }
-    return DataType[this.baseType].toLowerCase();
+    return this.specNames[this.specNames.length - 1];
   }
 
   catStr(): string | undefined {
@@ -189,8 +186,8 @@ class VarEntry extends InfoEntry {
   }
 
   private parseType() {
-    const tokens = VarEntry.tokenizer.tokenize(this.decl);
-    let type = VarEntry.parser.parse(tokens);
+    const tokens = TOKENIZER.tokenize(this.decl);
+    let type = PARSER.parse(tokens);
     this.isPtr = false;
     this.innerCount = 1;
 
@@ -212,41 +209,29 @@ class VarEntry extends InfoEntry {
     if (!(type instanceof SpecifierType)) {
       throw new Error('Base type must be specifier type');
     }
-    this.baseType = type.dataType;
-    if (type instanceof TaggedType) {
-      this.structName = type.name;
-    }
+    this.specNames = type.names;
+    this.specKind = type.kind;
   }
 }
 
-class StructVarEntry extends VarEntry {
-  offset!: number;
+class NamedVarEntry extends VarEntry {
+  name!: string;
 
   constructor(entry: DictEntry) {
     super(entry);
-    this.offset = parseInt(entry[KEY_OFF] as string)
-  }
-
-  override sortValue(): number {
-    return this.offset;
-  }
-
-  /** Returns the address of this field in item 0 */
-  getOffsetToolTip(parentAddr: number): string {
-    if (isNaN(parentAddr)) {
-      return '';
-    }
-    return 'Address: ' + toHex(parentAddr + this.offset);
+    this.name = entry[KEY_NAME] as string;
   }
 }
 
 /** Represents ram and data entries */
-class DataEntry extends VarEntry {
+class DataEntry extends NamedVarEntry {
   addr!: number;
+  loc!: string;
 
   constructor(entry: DictEntry) {
     super(entry);
     this.addr = parseInt(entry[KEY_ADDR] as string)
+    this.loc = entry[KEY_LOC] as string;
   }
 
   override sortValue(): number {
@@ -255,21 +240,25 @@ class DataEntry extends VarEntry {
 }
 
 class CodeEntry extends InfoEntry {
+  name!: string;
   addr!: number;
   size!: number;
   mode!: string;
-  params?: VarEntry[];
+  params?: NamedVarEntry[];
   return?: VarEntry;
+  loc!: string;
 
   constructor(entry: DictEntry) {
     super(entry);
+    this.name = entry[KEY_NAME] as string;
     this.addr = parseInt(entry[KEY_ADDR] as string);
     this.size = parseInt(entry[KEY_SIZE] as string);
     this.mode = STR_TO_MODE[entry[KEY_MODE] as string];
     const params = entry[KEY_PARAMS] as DictEntry[];
-    this.params = params?.map(p => new VarEntry(p));
+    this.params = params?.map(p => new NamedVarEntry(p));
     const ret = entry[KEY_RET] as DictEntry;
     this.return = ret ? new VarEntry(ret) : undefined;
+    this.loc = entry[KEY_LOC] as string;
   }
 
   override sortValue(): number {
@@ -291,11 +280,67 @@ class CodeEntry extends InfoEntry {
   }
 }
 
+class StructVarEntry extends NamedVarEntry {
+  offset!: number;
+  bits?: number;
+
+  constructor(entry: DictEntry) {
+    super(entry);
+    this.offset = parseInt(entry[KEY_OFF] as string)
+    const bits = entry[KEY_BITS] as string;
+    this.bits = bits ? parseInt(bits) : undefined;
+  }
+
+  override sortValue(): number {
+    return this.offset;
+  }
+
+  /** Returns the address of this field in item 0 */
+  getOffsetToolTip(parentAddr: number): string {
+    if (isNaN(parentAddr)) {
+      return '';
+    }
+    return 'Address: ' + toHex(parentAddr + this.offset);
+  }
+}
+
+class StructEntry extends InfoEntry {
+  name!: string;
+  size!: number;
+  vars!: StructVarEntry[];
+  loc!: string;
+
+  constructor(entry: DictEntry) {
+    super(entry);
+    this.name = entry[KEY_NAME] as string;
+    this.size = parseInt(entry[KEY_SIZE] as string);
+    this.vars = (entry[KEY_VARS] as DictEntry[]).map(v => new StructVarEntry(v));
+    this.loc = entry[KEY_LOC] as string;
+  }
+}
+
+class UnionEntry extends InfoEntry {
+  name!: string;
+  size!: number;
+  vars!: NamedVarEntry[];
+  loc!: string;
+
+  constructor(entry: DictEntry) {
+    super(entry);
+    this.name = entry[KEY_NAME] as string;
+    this.size = parseInt(entry[KEY_SIZE] as string);
+    this.vars = (entry[KEY_VARS] as DictEntry[]).map(v => new NamedVarEntry(v));
+    this.loc = entry[KEY_LOC] as string;
+  }
+}
+
 class EnumValEntry extends InfoEntry {
+  name!: string;
   val!: number;
 
   constructor(entry: DictEntry) {
     super(entry);
+    this.name = entry[KEY_NAME] as string;
     this.val = parseInt(entry[KEY_VAL] as string);
   }
 
@@ -305,24 +350,30 @@ class EnumValEntry extends InfoEntry {
 }
 
 class EnumEntry extends InfoEntry {
+  name!: string;
   vals!: EnumValEntry[];
+  loc!: string;
 
   constructor(entry: DictEntry) {
     super(entry);
-    this.vals = (entry['vals'] as DictEntry[]).map(v => new EnumValEntry(v));
+    this.name = entry[KEY_NAME] as string;
+    this.vals = (entry[KEY_VALS] as DictEntry[]).map(v => new EnumValEntry(v));
+    this.loc = entry[KEY_LOC] as string;
   }
 }
 
-class StructEntry extends InfoEntry {
-  size!: number;
-  vars!: StructVarEntry[];
+class TypedefEntry extends InfoEntry {
+  name!: string;
+  decl!: string;
+  type!: AssetType;
+  loc!: string;
 
   constructor(entry: DictEntry) {
     super(entry);
-    this.size = parseInt(entry[KEY_SIZE] as string);
-    this.vars = (entry['vars'] as DictEntry[]).map(v => new StructVarEntry(v));
+    this.name = entry[KEY_NAME] as string;
+    this.decl = entry[KEY_TYPE] as string;
+    const tokens = TOKENIZER.tokenize(this.decl);
+    this.type = PARSER.parse(tokens);
+    this.loc = entry[KEY_LOC] as string;
   }
 }
-
-type StructEntryDict = { [key: string]: StructEntry };
-type EnumEntryDict = { [key: string]: EnumEntry };

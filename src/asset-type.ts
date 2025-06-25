@@ -1,83 +1,105 @@
 export {
-  SpecifierType, TaggedType, OuterType, PointerType,
+  AssetType, SpecifierType, OuterType, PointerType,
   ArrayType, FunctionType, TypeTokenizer, TypeParser
 };
 import { toHex } from './utils';
 
+const BUILT_IN_TYPES: Set<string> = new Set([
+  'void', 'char', 'short', 'int', 'long',
+  'float', 'double', 'signed', 'unsigned'
+]);
+
+export const BUILT_IN_SIZES: { [key: string]: number } = {
+  ['char']: 1,
+  ['short']: 2,
+  ['int']: 4,
+  ['float']: 4,
+  ['double']: 8
+};
+
 // -------- AST --------
 
-export enum DataType {
-  Void,
-  U8,
-  S8,
-  U16,
-  S16,
-  U32,
-  S32,
-  Struct
+export enum TypeSpecKind {
+  BuiltIn,
+  Typedef,
+  Enum,
+  Struct,
+  Union
+}
+
+export namespace TypeSpecKind {
+  export function isTag(kind: TypeSpecKind): boolean {
+    switch (kind) {
+      case TypeSpecKind.Enum:
+      case TypeSpecKind.Struct:
+      case TypeSpecKind.Union:
+        return true;
+      default:
+        return false;
+    }
+  }
+}
+
+export enum TypeQual {
+  Const,
+  Volatile
+}
+
+export namespace TypeQual {
+  export function fromString(str: string): TypeQual {
+    switch (str) {
+      case 'const':
+        return TypeQual.Const;
+      case 'volatile':
+        return TypeQual.Volatile;
+      default:
+        throw new Error(`Invalid type qualifier ${str}`);
+    }
+  }
 }
 
 abstract class AssetType {
-  abstract baseType(): DataType;
+  abstract specKind(): TypeSpecKind;
+  abstract specNames(): string[];
   abstract specName(): string;
   
   abstract declStr(decl: string): string;
 }
 
-abstract class SpecifierType extends AssetType {
-  dataType!: DataType;
+class SpecifierType extends AssetType {
+  names!: string[];
+  kind!: TypeSpecKind;
+  quals!: TypeQual[];
 
-  constructor(dataType: DataType) {
+  constructor(names: string[], kind: TypeSpecKind, quals: TypeQual[]) {
     super();
-    this.dataType = dataType;
+    this.names = names;
+    this.kind = kind;
+    this.quals = quals;
   }
 
-  override baseType(): DataType {
-    return this.dataType;
+  override specKind(): TypeSpecKind {
+    return this.kind;
   }
-}
 
-class PrimitiveType extends SpecifierType {
-  constructor(dataType: DataType) {
-    super(dataType);
-    if (dataType === DataType.Struct) {
-      throw new Error('Primitive types cannot be struct');
-    }
+  override specNames(): string[] {
+    return this.names;
   }
 
   override specName(): string {
-    return DataType[this.dataType].toLowerCase();
+    return this.names[this.names.length - 1];
   }
 
-  override declStr(decl: string = ''): string {
-    if (decl !== '') {
-      return `${this.specName()} ${decl}`;
+  override declStr(decl: string): string {
+    const parts = this.quals.map(q => TypeQual[q].toLowerCase());
+    if (TypeSpecKind.isTag(this.kind)) {
+      parts.push(TypeSpecKind[this.kind].toLowerCase());
     }
-    return this.specName();
-  }
-}
-
-class TaggedType extends SpecifierType {
-  name!: string;
-
-  constructor(dataType: DataType, name: string) {
-    super(dataType);
-    if (dataType !== DataType.Struct) {
-      throw new Error('Tagged types must be struct');
+    parts.push(this.specNames().join(' '));
+    if (decl) {
+      parts.push(decl);
     }
-    this.name = name
-  }
-
-  override specName(): string {
-    return this.name;
-  }
-
-  override declStr(decl: string = ''): string {
-    const tagStr = `${DataType[this.dataType].toLowerCase()} ${this.name}`;
-    if (decl !== '') {
-      return `${tagStr} ${decl}`;
-    }
-    return tagStr;
+    return parts.join(' ');
   }
 }
 
@@ -89,8 +111,12 @@ abstract class OuterType extends AssetType {
     this.innerType = innerType;
   }
 
-  override baseType(): DataType {
-    return this.innerType.baseType();
+  override specKind(): TypeSpecKind {
+    return this.innerType.specKind();
+  }
+
+  override specNames(): string[] {
+    return this.innerType.specNames();
   }
 
   override specName(): string {
@@ -99,12 +125,22 @@ abstract class OuterType extends AssetType {
 }
 
 class PointerType extends OuterType {
-  constructor(innerType: AssetType) {
+  quals!: TypeQual[];
+
+  constructor(innerType: AssetType, quals: TypeQual[]) {
     super(innerType);
+    this.quals = quals;
   }
 
   override declStr(decl: string = ''): string {
-    let ptrStr = '*' + decl;
+    const parts = ['*']
+    for (const q of this.quals) {
+      parts.push(TypeQual[q].toLowerCase());
+    }
+    if (decl) {
+      parts.push(decl);
+    }
+    let ptrStr = parts.join(' ');
     if (this.innerType instanceof ArrayType || this.innerType instanceof FunctionType) {
       ptrStr = `(${ptrStr})`;
     }
@@ -127,17 +163,17 @@ class ArrayType extends OuterType {
 }
 
 class FunctionType extends OuterType {
-  paramList!: AssetType[];
+  params!: AssetType[];
 
   constructor(innerType: AssetType, paramList: AssetType[]) {
     super(innerType);
-    this.paramList = paramList;
+    this.params = paramList;
   }
 
   override declStr(decl: string = ''): string {
     let paramStr = '';
-    if (this.paramList !== null && this.paramList.length > 0) {
-      paramStr = this.paramList.map(p => p.declStr('')).join(', ');
+    if (this.params !== null && this.params.length > 0) {
+      paramStr = this.params.map(p => p.declStr('')).join(', ');
     }
     return this.innerType.declStr(decl + `(${paramStr})`);
   }
@@ -158,9 +194,9 @@ enum TokenName {
   Star,           // *
   Comma,          // ,
   // Specifiers and qualifiers
-  TypeSpec        // Ex: u8
-  //TypeQual,       // Ex: const
-  //StoreSpec       // Ex: static
+  SpecTag,        // Ex: struct
+  TypeQual,       // Ex: const
+  StoreSpec       // Ex: static
 }
 
 class Token {
@@ -193,14 +229,18 @@ class TypeTokenizer {
   };
 
   KEYWORDS: { [key: string]: TokenName } = {
-    ['void']: TokenName.TypeSpec,
-    ['u8']: TokenName.TypeSpec,
-    ['u16']: TokenName.TypeSpec,
-    ['u32']: TokenName.TypeSpec,
-    ['s8']: TokenName.TypeSpec,
-    ['s16']: TokenName.TypeSpec,
-    ['s32']: TokenName.TypeSpec,
-    ['struct']: TokenName.TypeSpec
+    // Specifier tags
+    ['enum']: TokenName.SpecTag,
+    ['struct']: TokenName.SpecTag,
+    ['union']: TokenName.SpecTag,
+    // Type qualifiers
+    ['const']: TokenName.TypeQual,
+    ['volatile']: TokenName.TypeQual,
+    // Storage qualifiers
+    ['extern']: TokenName.StoreSpec,
+    ['static']: TokenName.StoreSpec,
+    ['auto']: TokenName.StoreSpec,
+    ['register']: TokenName.StoreSpec
   };
 
   tokenize(text: string): Token[] {
@@ -216,12 +256,14 @@ class TypeTokenizer {
       if (c === ' ') {
         continue;
       }
-
+      // Check separator
       const sepName = this.SINGLE_CHAR_TOKENS[c];
       if (sepName !== undefined) {
         this.addToken(sepName, c);
+      // Check integer
       } else if (/[0-9]/.test(c)) {
         this.addToken(TokenName.Integer, this.alphaNum());
+      // Check identifier
       } else if (/[A-Za-z_]/.test(c)) {
         const ident = this.alphaNum();
         let name = this.KEYWORDS[ident];
@@ -259,21 +301,41 @@ class TypeTokenizer {
 
 // -------- Parser --------
 
+class ParseInfo {
+  spec!: AssetType;
+  root!: AssetType;
+  outer?: OuterType;
+  start!: number;
+  left!: number;
+
+  constructor(spec: AssetType, start: number, left: number) {
+    this.spec = spec;
+    this.root = spec;
+    this.outer = undefined;
+    this.start = start;
+    this.left = left;
+  }
+
+  updateParentTypes(newType: OuterType) {
+    if (!this.outer) {
+      this.root = newType;
+    } else {
+      this.outer.innerType = newType;
+    }
+    this.outer = newType;
+  }
+}
+
 class TypeParser {
   tokens!: Token[];
   idx!: number;
   currToken!: Token;
   prevToken!: Token;
 
-  DATA_TYPE_STRINGS: { [key: string]: DataType } = {
-    ['void']: DataType.Void,
-    ['u8']: DataType.U8,
-    ['u16']: DataType.U16,
-    ['u32']: DataType.U32,
-    ['s8']: DataType.S8,
-    ['s16']: DataType.S16,
-    ['s32']: DataType.S32,
-    ['struct']: DataType.Struct
+  TAG_TYPES: { [key: string]: TypeSpecKind } = {
+    ['enum']: TypeSpecKind.Enum,
+    ['struct']: TypeSpecKind.Struct,
+    ['union']: TypeSpecKind.Union
   };
 
   parse(tokens: Token[]): AssetType {
@@ -312,20 +374,12 @@ class TypeParser {
   }
 
   private parseDecl(start: number): AssetType {
-    function updateParentTypes(newType: OuterType) {
-      if (outer === undefined) {
-        root = newType;
-      } else {
-        outer.innerType = newType;
-      }
-      outer = newType;
-    }
-
     const inParam = start > 0;
 
-    // Must start with type specifier
+    // First tokens must be type spec
     const spec = this.parseTypeSpec();
     
+    // Check if already at end
     const tempName = this.currToken.name;
     if (tempName === TokenName.EOS) {
       return spec;
@@ -339,16 +393,18 @@ class TypeParser {
     let left = this.idx - 1;
 
     // Parse from middle outwards
-    let root = spec;
-    let outer: OuterType | undefined = undefined;
+    const info = new ParseInfo(spec, start, left);
     while (true) {
       if (this.accept(TokenName.LBracket)) {
-        const size = this.parseHex();
+        // Array
+        this.expect(TokenName.Integer);
+        const size = parseInt(this.prevToken.text.slice(2), 16);
         this.expect(TokenName.RBracket);
         const arrType = new ArrayType(spec, size);
-        updateParentTypes(arrType);
+        info.updateParentTypes(arrType);
       } else if (this.accept(TokenName.LParen)) {
-        const paramList: AssetType[] = [];
+        // Function
+        const params: AssetType[] = [];
         if (!this.accept(TokenName.RParen)) {
           while (true) {
             const paramType = this.parseDecl(this.idx);
@@ -356,7 +412,7 @@ class TypeParser {
               throw new Error('Unexpected EOS while parsing function parameters');
             }
 
-            paramList.push(paramType);
+            params.push(paramType);
             if (this.accept(TokenName.RParen)) {
               break;
             }
@@ -365,68 +421,68 @@ class TypeParser {
           }
         }
 
-        const funcType = new FunctionType(spec, paramList);
-        updateParentTypes(funcType);
+        const funcType = new FunctionType(spec, params);
+        info.updateParentTypes(funcType);
       } else if (this.currToken.name === TokenName.RParen) {
-        while (left > start) {
-          const name = this.tokens[left--].name;
-          if (name == TokenName.Star) {
-            const ptrType = new PointerType(spec);
-            updateParentTypes(ptrType);
-          } else if (name == TokenName.LParen) {
-            this.nextToken();
-            break;
-          }
-        }
-
-        if (inParam && left === start) {
+        // End of parentheses
+        this.parseLeft(info, false);
+        if (inParam && info.left === start) {
           break;
         }
       } else if (this.currToken.name === TokenName.EOS ||
           this.currToken.name === TokenName.Comma) {
-        while (left > start) {
-          const name = this.tokens[left--].name;
-          if (name == TokenName.Star) {
-            const ptrType = new PointerType(spec);
-            updateParentTypes(ptrType);
-          } else if (name == TokenName.LParen) {
-            throw new Error(`Unexpected token ${this.currToken.nameStr()}`);
-          }
-        }
-
+        // End of declaration (or param)
+        this.parseLeft(info, true);
         break;
       } else {
         throw new Error(`Unexpected token ${this.currToken.nameStr()}`);
       }
     }
 
-    return root;
+    return info.root;
   }
 
   private parseTypeSpec(): AssetType {
-    this.expect(TokenName.TypeSpec);
-
-    const dataType = this.DATA_TYPE_STRINGS[this.prevToken.text];
-
-    if (dataType == DataType.Struct) {
-      this.expect(TokenName.Ident);
-      return new TaggedType(dataType, this.prevToken.text);
-    } else {
-      return new PrimitiveType(dataType);
+    const names: string[] = [];
+    const quals: TypeQual[] = [];
+    let kind: TypeSpecKind;
+    while (this.accept(TokenName.TypeQual)) {
+      const text = this.prevToken.text.toLowerCase();
+      quals.push(TypeQual.fromString(text));
     }
+    if (this.accept(TokenName.SpecTag)) {
+      kind = this.TAG_TYPES[this.prevToken.text];
+      this.expect(TokenName.Ident);
+      names.push(this.prevToken.text);
+    } else {
+      this.expect(TokenName.Ident);
+      names.push(this.prevToken.text);
+      if (BUILT_IN_TYPES.has(names[0])) {
+        kind = TypeSpecKind.BuiltIn;
+        while (this.accept(TokenName.Ident)) {
+          const name = this.prevToken.text;
+          if (!BUILT_IN_TYPES.has(name)) {
+            throw new Error(`Expected built-in type but got ${name}`);
+          }
+          names.push(name);
+        }
+      } else {
+        // typedefs should only have one name
+        kind = TypeSpecKind.Typedef;
+      }
+    }
+    return new SpecifierType(names, kind, quals);
   }
 
   private findDeclMiddle() {
-    while (true)
-    {
-      if (this.accept(TokenName.Star))
+    while (true) {
+      if (this.accept(TokenName.TypeQual) || this.accept(TokenName.Star)) {
         continue;
+      }
 
-      if (this.currToken.name == TokenName.LParen)
-      {
+      if (this.currToken.name == TokenName.LParen) {
         const nextName = this.tokens[this.idx + 1].name;
-        if (nextName != TokenName.RParen && nextName != TokenName.TypeSpec)
-        {
+        if (nextName !== TokenName.RParen && nextName !== TokenName.Ident) {
           this.nextToken();
           continue;
         }
@@ -436,8 +492,27 @@ class TypeParser {
     }
   }
 
-  private parseHex(): number {
-    this.expect(TokenName.Integer);
-    return parseInt(this.prevToken.text.slice(2), 16);
+  private parseLeft(info: ParseInfo, decl_end: boolean) {
+    let quals: TypeQual[] = [];
+    while (info.left > info.start) {
+      const token = this.tokens[info.left--];
+      if (token.name === TokenName.Star) {
+        quals.reverse();
+        const ptrType = new PointerType(info.spec, quals);
+        info.updateParentTypes(ptrType);
+        quals = [];
+      } else if (token.name === TokenName.TypeQual) {
+        const text = token.text.toLowerCase();
+        quals.push(TypeQual.fromString(text));
+      } else if (token.name === TokenName.LParen) {
+        if (decl_end) {
+          const tn = this.currToken.nameStr();
+          throw new Error(`Unexpected token ${tn}`);
+        } else {
+          this.nextToken();
+          break;
+        }
+      }
+    }
   }
 }

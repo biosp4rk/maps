@@ -1,8 +1,9 @@
 import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import {
-  InfoEntry, VarEntry, DataEntry, StructVarEntry, StructEntryDict,
-  EnumEntryDict, CodeEntry, EnumValEntry, StructEntry, EnumEntry, DataType
+  NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict,
+  InfoEntry, VarEntry, NamedVarEntry, DataEntry, StructVarEntry,
+  StructEntry, UnionEntry, CodeEntry, EnumValEntry, EnumEntry, TypedefEntry
 } from './info-entry';
 import { toHex } from './utils';
 import {
@@ -10,6 +11,11 @@ import {
   KEY_OFF, KEY_PARAMS, KEY_RET, KEY_SIZE, KEY_TYPE, KEY_VAL, KEY_VALS,
   KEY_VARS, CATEGORIES, getHeading
 } from './constants';
+import { TypeSpecKind } from './asset-type';
+
+const COMMIT_HASH = '08d51a9f368a05050b953208ff3505fbe13c54d7';
+const BASE_URL = 'https://github.com/metroidret/mzm/tree/';
+const FULL_URL = BASE_URL + COMMIT_HASH + '/';
 
 const grayBorder = css`1px solid #808080`;
 const font = css`Menlo, Monaco, "Courier New", monospace`;
@@ -138,8 +144,12 @@ export class MapTable extends LitElement {
   @property({ type: Array }) entries: InfoEntry[] = [];
   /** All struct definitions in the game */
   @property({ type: Object }) structs: StructEntryDict = {};
+  /** All union definitions in the game */
+  @property({ type: Object }) unions: UnionEntryDict = {};
   /** All enum definitions in the game */
   @property({ type: Object }) enums: EnumEntryDict = {};
+  /** Sizes of structs, unions, and typedefs */
+  @property({ type: Object }) sizes: { [key: string]: number } = {};
   /** Address of parent entry if table is part of row */
   @property({ type: Number }) parentAddr = NaN;
   /** Columns that should not be displayed */
@@ -174,11 +184,16 @@ export class MapTable extends LitElement {
       case TableType.CodeList:
         return [KEY_ADDR, KEY_LEN, KEY_NAME, KEY_PARAMS, KEY_RET, KEY_DESC];
       case TableType.StructList:
+        case TableType.UnionList:
         return [KEY_SIZE, KEY_NAME, KEY_VARS, KEY_DESC];
       case TableType.EnumList:
         return [KEY_NAME, KEY_VALS, KEY_DESC];
+      case TableType.TypedefList:
+        return [KEY_TYPE, KEY_NAME, KEY_DESC];
       case TableType.StructDef:
         return [KEY_OFF, KEY_LEN, KEY_TYPE, KEY_NAME, KEY_DESC];
+      case TableType.UnionDef:
+        return [KEY_LEN, KEY_TYPE, KEY_NAME, KEY_DESC];
       case TableType.EnumDef:
         return [KEY_VAL, KEY_NAME, KEY_DESC];
       default:
@@ -199,7 +214,9 @@ export class MapTable extends LitElement {
       case TableType.CodeList:
       case TableType.DataList:
       case TableType.StructList:
+      case TableType.UnionList:
       case TableType.EnumList:
+      case TableType.TypedefList:
         return true;
       default:
         return false;
@@ -235,20 +252,22 @@ export class MapTable extends LitElement {
     if (this.hiddenColumns.has(KEY_LEN)) {
       return '';
     }
-    const len = toHex(entry.getLength(this.structs));
-    const toolTip = entry.getLengthToolTip(this.structs);
+    const len = entry.getLength(this.sizes);
+    const lenStr = len !== 0 ? toHex(entry.getLength(this.sizes)) : '?';
+    const toolTip = entry.getLengthToolTip(this.sizes);
     return html`<td
       class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
-      title="${toolTip}">${len}</td>`;
+      title="${toolTip}">${lenStr}</td>`;
   }
 
   private hasSubTable(entry: InfoEntry): Boolean {
     if (entry instanceof VarEntry) {
       const ve = entry as VarEntry;
-      const isEnum = Boolean(ve.enum) && ve.enum! in this.enums;
-      const isStruct = ve.baseType === DataType.Struct;
-      return isEnum || isStruct;
+      return (Boolean(ve.enum) ||
+        ve.specKind === TypeSpecKind.Struct ||
+        ve.specKind === TypeSpecKind.Union);
     } else if (entry instanceof StructEntry ||
+      entry instanceof UnionEntry ||
       entry instanceof EnumEntry) {
       return true;
     }
@@ -261,8 +280,8 @@ export class MapTable extends LitElement {
       if (ve.enum && ve.enum! in this.enums) {
         const ee: EnumEntry = this.enums[ve.enum!];
         return this.renderEnumDef(ee);
-      } else if (ve.structName && ve.structName! in this.structs) {
-        const se = this.structs[ve.structName!];
+      } else if (ve.specKind === TypeSpecKind.Struct) {
+        const se = this.structs[ve.specName()];
         let pa = NaN;
         if (!ve.isPtr) {
           if (this.tableType === TableType.RamList ||
@@ -273,9 +292,23 @@ export class MapTable extends LitElement {
           }
         }
         return this.renderStructDef(se, pa);
+      } else if (ve.specKind === TypeSpecKind.Union) {
+        const ue = this.unions[ve.specName()];
+        let pa = NaN;
+        if (!ve.isPtr) {
+          if (this.tableType === TableType.RamList ||
+            this.tableType === TableType.DataList) {
+            pa = (entry as DataEntry).addr;
+          } else if (this.parentAddr) {
+            pa = this.parentAddr;
+          }
+        }
+        return this.renderUnionDef(ue, pa);
       }
     } else if (entry instanceof StructEntry) {
       return this.renderStructDef(entry as StructEntry);
+    } else if (entry instanceof UnionEntry) {
+      return this.renderUnionDef(entry as UnionEntry);
     } else if (entry instanceof EnumEntry) {
       return this.renderEnumDef(entry as EnumEntry);
     }
@@ -285,12 +318,13 @@ export class MapTable extends LitElement {
   private renderToggleAndTable(entry: InfoEntry) {
     const parts = [];
     if (this.hasSubTable(entry)) {
-      const key = entry.name;
+      const namedEntry = entry as NamedEntry;
+      const key = namedEntry.name;
       const expanded = this.expandedItems.has(key);
       parts.push(html`<span class="expand" data-expand-key="${key}"
         @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`);
       if (expanded) {
-        parts.push(this.renderSubTable(entry));
+        parts.push(this.renderSubTable(namedEntry));
       }
     }
     return parts;
@@ -317,12 +351,17 @@ export class MapTable extends LitElement {
     return parts;
   }
 
-  private renderName(entry: InfoEntry, canHaveSubTable: boolean) {
+  private renderName(entry: NamedEntry, canHaveSubTable: boolean, loc?: string) {
     const inner = this.renderNameInner(entry.name);
     const toggleAndTable = canHaveSubTable ? this.renderToggleAndTable(entry) : '';
-    return html`<td class="name">
-      <span class="name-span">${inner}</span>${toggleAndTable}
-    </td>`;
+    let span;
+    if (loc) {
+      const url = FULL_URL + loc.replace(':', '#L');
+      span = html`<a href=${url} target="_blank" class="name-span">${inner}</a>`;
+    } else {
+      span = html`<span class="name-span">${inner}</span>`;
+    }
+    return html`<td class="name">${span}${toggleAndTable}</td>`;
   }
 
   private renderDesc(desc?: string) {
@@ -338,7 +377,7 @@ export class MapTable extends LitElement {
       ${this.renderVarLength(entry)}
       ${this.renderCat(entry.catStr())}
       ${this.renderType(entry.typeStr())}
-      ${this.renderName(entry, true)}
+      ${this.renderName(entry, true, entry.loc)}
       ${this.renderDesc(entry.desc)}
     </tr>`;
   }
@@ -356,7 +395,8 @@ export class MapTable extends LitElement {
   private renderCodeVar(ve: VarEntry, paramIdx: number, entryName: string) {
     let codeVar = html`<span class="inline-type">${ve.typeStr()}</span>`;
     if (paramIdx >= 0) {
-      codeVar = html`${codeVar} <span class="name-span">${ve.name}</span>`
+      const namedVar = ve as NamedVarEntry;
+      codeVar = html`${codeVar} <span class="name-span">${namedVar.name}</span>`
     }
     let toggle: any = '';
     let descBox: any = '';
@@ -400,26 +440,27 @@ export class MapTable extends LitElement {
     return html`<tr>
       <td class="addr">${toHex(entry.addr)}</td>
       ${this.renderCodeLength(entry)}
-      ${this.renderName(entry, true)}
+      ${this.renderName(entry, true, entry.loc)}
       ${this.renderCodeParams(entry)}
       ${this.renderCodeRet(entry)}
       ${this.renderDesc(entry.desc)}
     </tr>`;
   }
 
-  private renderStructSize(size: number) {
+  private renderStructOrUnionSize(size: number) {
     if (this.hiddenColumns.has(KEY_SIZE)) {
       return '';
     }
     return html`<td class="size">${toHex(size)}</td>`;
   }
 
-  private renderStructEntry(entry: StructEntry) {
+  // TODO: Shared code with renderEnumEntry
+  private renderStructOrUnionEntry(entry: StructEntry | UnionEntry) {
     const toggleAndTable = this.renderToggleAndTable(entry);
     const vars = html`<td class="vars">${toggleAndTable}</td>`;
     return html`<tr>
-      ${this.renderStructSize(entry.size)}
-      ${this.renderName(entry, false)}
+      ${this.renderStructOrUnionSize(entry.size)}
+      ${this.renderName(entry, false, entry.loc)}
       ${vars}
       ${this.renderDesc(entry.desc)}
     </tr>`;
@@ -429,15 +470,23 @@ export class MapTable extends LitElement {
     const toggleAndTable = this.renderToggleAndTable(entry);
     const vals = html`<td class="vals">${toggleAndTable}</td>`;
     return html`<tr>
-      ${this.renderName(entry, false)}
+      ${this.renderName(entry, false, entry.loc)}
       ${vals}
+      ${this.renderDesc(entry.desc)}
+    </tr>`;
+  }
+
+  private renderTypedefEntry(entry: TypedefEntry) {
+    return html`<tr>
+      ${this.renderType(entry.decl)}
+      ${this.renderName(entry, false, entry.loc)}
       ${this.renderDesc(entry.desc)}
     </tr>`;
   }
 
   private renderStructVar(entry: StructVarEntry) {
     const toolTip = entry.getOffsetToolTip(this.parentAddr);
-    // Structs can have categories, but they're left out to save space
+    // Struct vars can have categories, but they're left out to save space
     return html`<tr>
       <td class="offset ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
         title="${toolTip}">
@@ -450,15 +499,15 @@ export class MapTable extends LitElement {
     </tr>`;
   }
 
-  private renderStructDef(entry: StructEntry, parentAddr: number = NaN) {
-    return html`<map-table
-      .tableType="${TableType.StructDef}"
-      .entries="${entry.vars}"
-      .structs="${this.structs}"
-      .enums="${this.enums}"
-      .parentAddr="${parentAddr}"
-      .hiddenColumns="${this.hiddenColumns}">
-    </map-table>`
+  // TODO: Shared code with renderStructVar?
+  private renderUnionVar(entry: NamedVarEntry) {
+    // Union vars can have categories, but they're left out to save space
+    return html`<tr>
+      ${this.renderVarLength(entry)}
+      ${this.renderType(entry.typeStr())}
+      ${this.renderName(entry, true)}
+      ${this.renderDesc(entry.desc)}
+    </tr>`;
   }
 
   private renderEnumVal(entry: EnumValEntry) {
@@ -467,6 +516,32 @@ export class MapTable extends LitElement {
       <td class="name">${entry.name}</td>
       ${this.renderDesc(entry.desc)}
     </tr>`;
+  }
+
+  private renderStructDef(entry: StructEntry, parentAddr: number = NaN) {
+    return html`<map-table
+      .tableType="${TableType.StructDef}"
+      .entries="${entry.vars}"
+      .structs="${this.structs}"
+      .unions="${this.unions}"
+      .enums="${this.enums}"
+      .sizes="${this.sizes}"
+      .parentAddr="${parentAddr}"
+      .hiddenColumns="${this.hiddenColumns}">
+    </map-table>`
+  }
+
+  private renderUnionDef(entry: UnionEntry, parentAddr: number = NaN) {
+    return html`<map-table
+      .tableType="${TableType.UnionDef}"
+      .entries="${entry.vars}"
+      .structs="${this.structs}"
+      .unions="${this.unions}"
+      .enums="${this.enums}"
+      .sizes="${this.sizes}"
+      .parentAddr="${parentAddr}"
+      .hiddenColumns="${this.hiddenColumns}">
+    </map-table>`
   }
 
   private renderEnumDef(entry: EnumEntry) {
@@ -483,23 +558,23 @@ export class MapTable extends LitElement {
     switch (this.tableType) {
       case TableType.RamList:
       case TableType.DataList:
-        const de = item as DataEntry;
-        return this.renderDataEntry(de);
+        return this.renderDataEntry(item as DataEntry);
       case TableType.CodeList:
-        const ce = item as CodeEntry;
-        return this.renderCodeEntry(ce);
+        return this.renderCodeEntry(item as CodeEntry);
       case TableType.StructList:
-        const se = item as StructEntry;
-        return this.renderStructEntry(se);
+        return this.renderStructOrUnionEntry(item as StructEntry);
+      case TableType.UnionList:
+        return this.renderStructOrUnionEntry(item as UnionEntry);
       case TableType.EnumList:
-        const ee = item as EnumEntry;
-        return this.renderEnumEntry(ee);
+        return this.renderEnumEntry(item as EnumEntry);
+      case TableType.TypedefList:
+        return this.renderTypedefEntry(item as TypedefEntry);
       case TableType.StructDef:
-        const sve = item as StructVarEntry;
-        return this.renderStructVar(sve);
+        return this.renderStructVar(item as StructVarEntry);
+      case TableType.UnionDef:
+        return this.renderUnionVar(item as NamedVarEntry);
       case TableType.EnumDef:
-        const eve = item as EnumValEntry;
-        return this.renderEnumVal(eve);
+        return this.renderEnumVal(item as EnumValEntry);
       default:
         throw new Error('Invalid TableType');
     }

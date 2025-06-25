@@ -1,9 +1,9 @@
 
 export const GAMES = [
-  {
-    name: 'Metroid Fusion',
-    value: 'mf',
-  },
+  // {
+  //   name: 'Metroid Fusion',
+  //   value: 'mf',
+  // },
   {
     name: 'Metroid Zero Mission',
     value: 'zm',
@@ -14,7 +14,9 @@ export const MAP_RAM = 'ram';
 export const MAP_CODE = 'code';
 export const MAP_DATA = 'data';
 export const MAP_STRUCTS = 'structs';
+export const MAP_UNIONS = 'unions';
 export const MAP_ENUMS = 'enums';
+export const MAP_TYPEDEFS = 'typedefs';
 
 export const MAPS = [
   {
@@ -34,8 +36,16 @@ export const MAPS = [
     value: MAP_STRUCTS
   },
   {
+    name: 'Unions',
+    value: MAP_UNIONS
+  },
+  {
     name: 'Enums',
     value: MAP_ENUMS
+  },
+  {
+    name: 'Typedefs',
+    value: MAP_TYPEDEFS
   }
 ];
 
@@ -45,20 +55,25 @@ export enum TableType {
   CodeList,
   DataList,
   StructList,
+  UnionList,
   EnumList,
+  TypedefList,
   StructDef,
+  UnionDef,
   EnumDef
 }
 
 export const REGIONS = ['U', 'E', 'J', 'C'];
 
 export const KEY_ADDR = 'addr';
+export const KEY_BITS = 'bits';
 export const KEY_CAT = 'cat';
 // export const KEY_COMP = 'comp';
 export const KEY_COUNT = 'count';
 export const KEY_DESC = 'desc';
 export const KEY_ENUM = 'enum';
 export const KEY_LEN = 'length';
+export const KEY_LOC = 'loc';
 export const KEY_MODE = 'mode';
 export const KEY_NAME = 'name';
 export const KEY_OFF = 'offset';
@@ -101,6 +116,7 @@ const HEADINGS: { [key: string]: string } = {
 };
 
 export const CATEGORIES: { [key: string]: string } = {
+  'bool': 'Boolean',
   'flags': 'Flags',
   'ascii': 'ASCII',
   'sjis': 'Shift JIS',
@@ -127,7 +143,9 @@ export function getMainTableType(map: string): TableType {
     case MAP_DATA: return TableType.DataList;
     case MAP_CODE: return TableType.CodeList;
     case MAP_STRUCTS: return TableType.StructList;
+    case MAP_UNIONS: return TableType.UnionList;
     case MAP_ENUMS: return TableType.EnumList;
+    case MAP_TYPEDEFS: return TableType.TypedefList;
     default: return TableType.None;
   }
 }
