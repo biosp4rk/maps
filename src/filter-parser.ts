@@ -2,9 +2,8 @@
 // Space -> /\s+/
 // Hex -> /[0-9A-F]+/
 // Filter -> FilterItem (Space FilterItem)*
-// FilterItem -> Term | Quote | Regex | Addr
+// FilterItem -> Term | Regex | Addr
 // Term -> /\S+/
-// Quote -> '"' /[^"]*/ '"'
 // Regex -> '/' /[^/]*/ '/'
 // Addr -> AddrEQ | AddrGT | AddrLT | AddrGE | AddrLE | AddrNear
 // AddrEQ -> '=' Hex
@@ -17,9 +16,8 @@
 
 const ROM_OFFSET = 0x8000000;
 
-export enum SearchType {
+export enum FilterType {
   Term,
-  Quote,
   Regex,
   AddrEQ,
   AddrGT,
@@ -30,66 +28,64 @@ export enum SearchType {
 }
 
 export class FilterItem {
-
-  public text: string;
-  public type: SearchType;
+  public type: FilterType;
   public exclude: boolean;
-  public addr: number | null;
+  public term: string;
   public regex: RegExp | null;
+  public addr: number | null;
   
-  constructor(type: SearchType, exclude: boolean, text: string = '') {
-    this.text = text;
+  constructor(type: FilterType, exclude: boolean, term: string = '') {
     this.type = type;
     this.exclude = exclude;
+    this.term = term;
     this.addr = null;
     this.regex = null;
   }
-
 }
 
 export class FilterParser {
-
   private static filter: string;
   private static index: number;
   private static items: Array<FilterItem>;
   private static exclude: boolean;
 
   public static parse(filter: string): Array<FilterItem> {
-    // setup
+    // Setup
     this.filter = filter;
     this.initialize();
     
-    // parse
+    // Parse
     this.parseFilterStart();
 
-    // finalize results
+    // Finalize results
     let results: FilterItem[] = [];
     for (const item of this.items) {
       switch (item.type) {
-        case SearchType.Regex:
-          // create RegExp objects now (avoid making them on the fly later)
-          item.regex = new RegExp(item.text, 'i');
+        case FilterType.Term:
+          item.term = item.term.toLowerCase();
           break;
-        case SearchType.AddrEQ:
-        case SearchType.AddrGT:
-        case SearchType.AddrLT:
-        case SearchType.AddrGE:
-        case SearchType.AddrLE:
-        case SearchType.AddrNear:
-          // exclude addr filter if not valid hex
-          if (!/(0x)?[0-9A-Fa-f]+/.test(item.text)) {
+        case FilterType.Regex:
+          // Create RegExp objects now (avoid making them on the fly later)
+          item.regex = new RegExp(item.term, 'i');
+          break;
+        case FilterType.AddrEQ:
+        case FilterType.AddrGT:
+        case FilterType.AddrLT:
+        case FilterType.AddrGE:
+        case FilterType.AddrLE:
+        case FilterType.AddrNear:
+          // Exclude addr filter if not valid hex
+          if (!/(0x)?[0-9A-Fa-f]+/.test(item.term)) {
             continue;
           }
-          item.addr = parseInt(item.text, 16);
-          // check if virtual rom address
+          item.addr = parseInt(item.term, 16);
+          // Check if virtual rom address
           if (item.addr >= ROM_OFFSET) {
             item.addr -= ROM_OFFSET;
           }
           break;
         default:
-          // lowercase terms and quotes
-          item.text = item.text.toLowerCase();
-          break;
+          throw new Error('Invalid FilterType ' + item.type);
       }
       results.push(item);
     }
@@ -113,7 +109,7 @@ export class FilterParser {
 
   private static addToLast(text: string): void {
     const last = this.items.length - 1;
-    this.items[last].text += text;
+    this.items[last].term += text;
   }
 
   private static parseFilterStart(): void {
@@ -138,34 +134,33 @@ export class FilterParser {
     if (this.index >= this.filter.length) {
       return false;
     }
-    let searchType: SearchType;
-    if (c === "=") {
-      // double equals is also allowed,
-      // so skip second equals if present
-      if (this.filter[this.index] === "=") {
+    let searchType: FilterType;
+    if (c === '=') {
+      // Double equals is also allowed, so skip second equals if present
+      if (this.filter[this.index] === '=') {
         this.index++;
       }
-      searchType = SearchType.AddrEQ;
-    } else if (c === ">") {
-        if (this.filter[this.index] === "=") {
+      searchType = FilterType.AddrEQ;
+    } else if (c === '>') {
+        if (this.filter[this.index] === '=') {
           this.index++;
-          searchType = SearchType.AddrGE;
+          searchType = FilterType.AddrGE;
         } else {
-          searchType = SearchType.AddrGT;
+          searchType = FilterType.AddrGT;
         }
-    } else if (c === "<") {
-      if (this.filter[this.index] === "=") {
+    } else if (c === '<') {
+      if (this.filter[this.index] === '=') {
         this.index++;
-        searchType = SearchType.AddrLE;
+        searchType = FilterType.AddrLE;
       } else {
-        searchType = SearchType.AddrLT;
+        searchType = FilterType.AddrLT;
       }
-    } else if (c === "~") {
-        searchType = SearchType.AddrNear;
+    } else if (c === '~') {
+        searchType = FilterType.AddrNear;
     } else {
       return false;
     }
-    // add new filter item
+    // Add new filter item
     const item = new FilterItem(searchType, this.exclude);
     this.items.push(item);
     this.parseFilterTerm();
@@ -173,15 +168,12 @@ export class FilterParser {
   }
 
   private static parseFilterNonAddr(c: string): void {
-    // item text is expected, so don't check for minus or space
-    if (c === '"') {
-      this.items.push(new FilterItem(SearchType.Quote, this.exclude));
-      this.parseFilterQuote();
-    } else if (c === '/') {
-      this.items.push(new FilterItem(SearchType.Regex, this.exclude));
+    // Item text is expected, so don't check for minus or space
+    if (c === '/') {
+      this.items.push(new FilterItem(FilterType.Regex, this.exclude));
       this.parseFilterRegex();
     } else {
-      this.items.push(new FilterItem(SearchType.Term, this.exclude, c));
+      this.items.push(new FilterItem(FilterType.Term, this.exclude, c));
       this.parseFilterTerm();
     }
   }
@@ -190,7 +182,7 @@ export class FilterParser {
     if (this.index >= this.filter.length) {
       return
     }
-    // new item is expected, so check for minus but not space
+    // New item is expected, so check for minus but not space
     const c = this.filter[this.index++];
     if (this.tryParseFilterAddr(c)) {
       return;
@@ -207,31 +199,12 @@ export class FilterParser {
     if (this.index >= this.filter.length) {
       return
     }
-    // item text is expected, so don't check for minus or space
+    // Item text is expected, so don't check for minus or space
     const c = this.filter[this.index++];
     if (this.tryParseFilterAddr(c)) {
       return;
     }
     this.parseFilterNonAddr(c);
-  }
-
-  private static parseFilterQuote(): void {
-    this.exclude = false;
-    let terminated = false;
-    while (this.index < this.filter.length) {
-      const c = this.filter[this.index++];
-      if (c === '"') {
-        terminated = true;
-        break;
-      }
-      this.addToLast(c);
-    }
-    if (!terminated) {
-      // TODO: indicate problem to user
-      this.items.pop();
-      return;
-    }
-    this.parseFilterSpace();
   }
   
   private static parseFilterRegex(): void {
@@ -252,7 +225,7 @@ export class FilterParser {
       this.addToLast(c);
     }
     if (!terminated) {
-      // TODO: indicate problem to user
+      // TODO: Indicate problem to user
       this.items.pop();
       return;
     }
@@ -277,5 +250,4 @@ export class FilterParser {
     }
     this.parseFilterSpace();
   }
-
 }

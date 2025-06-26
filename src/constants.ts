@@ -1,11 +1,11 @@
 
 export const GAMES = [
+  // {
+  //   name: 'Metroid Fusion',
+  //   value: 'mf',
+  // },
   {
-    label: 'Metroid Fusion',
-    value: 'mf',
-  },
-  {
-    label: 'Metroid Zero Mission',
+    name: 'Metroid Zero Mission',
     value: 'zm',
   }
 ];
@@ -14,28 +14,38 @@ export const MAP_RAM = 'ram';
 export const MAP_CODE = 'code';
 export const MAP_DATA = 'data';
 export const MAP_STRUCTS = 'structs';
+export const MAP_UNIONS = 'unions';
 export const MAP_ENUMS = 'enums';
+export const MAP_TYPEDEFS = 'typedefs';
 
 export const MAPS = [
   {
-    label: 'RAM',
+    name: 'RAM',
     value: MAP_RAM
   },
   {
-    label: 'ROM Code',
+    name: 'ROM Code',
     value: MAP_CODE
   },
   {
-    label: 'ROM Data',
+    name: 'ROM Data',
     value: MAP_DATA
   },
   {
-    label: 'Structs',
+    name: 'Structs',
     value: MAP_STRUCTS
   },
   {
-    label: 'Enums',
+    name: 'Unions',
+    value: MAP_UNIONS
+  },
+  {
+    name: 'Enums',
     value: MAP_ENUMS
+  },
+  {
+    name: 'Typedefs',
+    value: MAP_TYPEDEFS
   }
 ];
 
@@ -45,23 +55,27 @@ export enum TableType {
   CodeList,
   DataList,
   StructList,
+  UnionList,
   EnumList,
+  TypedefList,
   StructDef,
+  UnionDef,
   EnumDef
 }
 
 export const REGIONS = ['U', 'E', 'J', 'C'];
 
 export const KEY_ADDR = 'addr';
+export const KEY_BITS = 'bits';
 export const KEY_CAT = 'cat';
 // export const KEY_COMP = 'comp';
 export const KEY_COUNT = 'count';
 export const KEY_DESC = 'desc';
 export const KEY_ENUM = 'enum';
-export const KEY_LABEL = 'label';
 export const KEY_LEN = 'length';
+export const KEY_LOC = 'loc';
 export const KEY_MODE = 'mode';
-export const KEY_NOTES = 'notes';
+export const KEY_NAME = 'name';
 export const KEY_OFF = 'offset';
 export const KEY_PARAMS = 'params';
 export const KEY_RET = 'return';
@@ -74,9 +88,8 @@ export const KEY_VARS = 'vars';
 const HEAD_ADDR = 'Address';
 const HEAD_CAT = 'Category';
 const HEAD_DESC = 'Description';
-const HEAD_LABEL = 'Label';
+const HEAD_NAME = 'Name';
 const HEAD_LEN = 'Length';
-const HEAD_NOTES = 'Notes';
 const HEAD_OFF = 'Offset';
 const HEAD_PARAMS = 'Arguments';
 const HEAD_RET = 'Returns';
@@ -90,9 +103,8 @@ const HEADINGS: { [key: string]: string } = {
   [KEY_ADDR]: HEAD_ADDR,
   [KEY_CAT]: HEAD_CAT,
   [KEY_DESC]: HEAD_DESC,
-  [KEY_LABEL]: HEAD_LABEL,
   [KEY_LEN]: HEAD_LEN,
-  [KEY_NOTES]: HEAD_NOTES,
+  [KEY_NAME]: HEAD_NAME,
   [KEY_OFF]: HEAD_OFF,
   [KEY_PARAMS]: HEAD_PARAMS,
   [KEY_RET]: HEAD_RET,
@@ -104,9 +116,10 @@ const HEADINGS: { [key: string]: string } = {
 };
 
 export const CATEGORIES: { [key: string]: string } = {
+  'bool': 'Boolean',
   'flags': 'Flags',
   'ascii': 'ASCII',
-  'sjis': "Shift JIS",
+  'sjis': 'Shift JIS',
   'text': 'Text',
   'gfx': 'Graphics',
   'tilemap': 'Tilemap',
@@ -130,7 +143,9 @@ export function getMainTableType(map: string): TableType {
     case MAP_DATA: return TableType.DataList;
     case MAP_CODE: return TableType.CodeList;
     case MAP_STRUCTS: return TableType.StructList;
+    case MAP_UNIONS: return TableType.UnionList;
     case MAP_ENUMS: return TableType.EnumList;
+    case MAP_TYPEDEFS: return TableType.TypedefList;
     default: return TableType.None;
   }
 }
@@ -155,12 +170,8 @@ export function getHideableColumns(tableType: TableType): { head: string; key: s
         key: KEY_TYPE
       },
       {
-        head: HEAD_LABEL,
-        key: KEY_LABEL
-      },
-      {
-        head: HEAD_NOTES,
-        key: KEY_NOTES
+        head: HEAD_DESC,
+        key: KEY_DESC
       }
     ];
   } else if (tableType === TableType.CodeList) {
@@ -168,10 +179,6 @@ export function getHideableColumns(tableType: TableType): { head: string; key: s
       {
         head: HEAD_LEN,
         key: KEY_LEN
-      },
-      {
-        head: HEAD_LABEL,
-        key: KEY_LABEL
       },
       {
         head: HEAD_PARAMS,
@@ -182,34 +189,26 @@ export function getHideableColumns(tableType: TableType): { head: string; key: s
         key: KEY_RET
       },
       {
-        head: HEAD_NOTES,
-        key: KEY_NOTES
+        head: HEAD_DESC,
+        key: KEY_DESC
       }
     ];
   } else if (tableType === TableType.StructList) {
     return [
       {
-        head: HEAD_LABEL,
-        key: KEY_LABEL
-      },
-      {
         head: HEAD_SIZE,
         key: KEY_SIZE
       },
       {
-        head: HEAD_NOTES,
-        key: KEY_NOTES
+        head: HEAD_DESC,
+        key: KEY_DESC
       }
     ];
   } else if (tableType === TableType.EnumList) {
     return [
       {
-        head: HEAD_LABEL,
-        key: KEY_LABEL
-      },
-      {
-        head: HEAD_NOTES,
-        key: KEY_NOTES
+        head: HEAD_DESC,
+        key: KEY_DESC
       }
     ];
   }
