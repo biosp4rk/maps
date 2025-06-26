@@ -95,11 +95,12 @@ class SpecifierType extends AssetType {
     if (TypeSpecKind.isTag(this.kind)) {
       parts.push(TypeSpecKind[this.kind].toLowerCase());
     }
-    parts.push(this.specNames().join(' '));
+    parts.push(...this.specNames());
+    let specStr = parts.join(' ');
     if (decl) {
-      parts.push(decl);
+      specStr += decl[0] === '*' ? decl : ' ' + decl;
     }
-    return parts.join(' ');
+    return specStr;
   }
 }
 
@@ -137,10 +138,14 @@ class PointerType extends OuterType {
     for (const q of this.quals) {
       parts.push(TypeQual[q].toLowerCase());
     }
-    if (decl) {
-      parts.push(decl);
-    }
     let ptrStr = parts.join(' ');
+    if (decl) {
+      if (ptrStr[ptrStr.length - 1] === '*' && decl[0] === '*') {
+        ptrStr += decl;
+      } else {
+        ptrStr += ' ' + decl;
+      }
+    }
     if (this.innerType instanceof ArrayType || this.innerType instanceof FunctionType) {
       ptrStr = `(${ptrStr})`;
     }
@@ -513,6 +518,10 @@ class TypeParser {
           break;
         }
       }
+    }
+    if (quals.length > 0) {
+      const qs = quals.map(q => TypeQual[q].toLowerCase()).join(' ');
+      throw new Error(`Unexpected type qualifier ${qs}`);
     }
   }
 }

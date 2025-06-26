@@ -177,7 +177,7 @@ class VarEntry extends InfoEntry {
     let ts = this.decl;
     if (this.arrCount) {
       const last = ts[ts.length - 1];
-      if (last !== '*' && last !== ']' && last !== ')') {
+      if (last !== ']' && last !== ')') {
         ts += ' ';
       }
       ts += '[0x' + toHex(this.arrCount) + ']';
