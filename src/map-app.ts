@@ -10,9 +10,9 @@ import {
 } from './info-entry';
 import { FilterItem, FilterParser, FilterType } from './filter-parser';
 import "./map-table";
-import { ArrayType, AssetType, FunctionType, PointerType, SpecifierType, TypeSpecKind } from './asset-type';
+import { TypeSpecKind, AssetType, SpecifierType, PointerType, ArrayType, FunctionType } from './asset-type';
 
-const VERSION = 4;
+const VERSION = 5;
 
 const URL_GAME = 'game';
 const URL_MAP = 'map';
@@ -122,8 +122,6 @@ export class MapApp extends LitElement {
     }
 
     #page-nav {
-      /* grid-column: 1 / 3;
-      grid-row: 3; */
       padding-bottom: 10px;
       text-align: center;
     }
