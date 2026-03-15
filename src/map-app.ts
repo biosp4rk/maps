@@ -475,8 +475,12 @@ export class MapApp extends LitElement {
     name: string,
     item: FilterItem,
     structUnionName: string = '',
-    enumName: string = ''
+    enumName: string = '',
+    seenParents: Set<string> = new Set<string>()
   ): boolean {
+    if (seenParents.has(structUnionName)) {
+      return false;
+    }
     name = name.toLowerCase();
     if (item.type === FilterType.Term) {
       if (name.includes(item.term) !== item.exclude) {
@@ -489,17 +493,16 @@ export class MapApp extends LitElement {
     }
     // Check if entry is struct or union
     if (this.searchStructsUnions && structUnionName) {
+      let suEntry = undefined;
       if (structUnionName in this.structs) {
-        const se = this.structs[structUnionName];
-        if (se.vars.some(
-          sv => this.checkNameFilter(sv.name, item, sv.specName(), sv.enum))
-        ) {
-          return true;
-        }
+        suEntry = this.structs[structUnionName];
       } else if (structUnionName in this.unions) {
-        const ue = this.unions[structUnionName];
-        if (ue.vars.some(
-          uv => this.checkNameFilter(uv.name, item, uv.specName(), uv.enum))
+        suEntry = this.unions[structUnionName];
+      }
+      if (suEntry) {
+        seenParents.add(structUnionName);
+        if (suEntry.vars.some(
+          su => this.checkNameFilter(su.name, item, su.specName(), su.enum, seenParents))
         ) {
           return true;
         }
