@@ -12,7 +12,15 @@ import { FilterItem, FilterParser, FilterType } from './filter-parser';
 import "./map-table";
 import { TypeSpecKind, AssetType, SpecifierType, PointerType, ArrayType, FunctionType } from './asset-type';
 
-const VERSION = 5;
+const VERSION = 6;
+
+const GIT_COMMIT_MF = '47234f39e85ccefecd5d5125d9a711fa726b1a2c';
+const GIT_COMMIT_ZM = '72a40125ad9e1b790e967c8fe053bf6fc86c3fab';
+
+const GITHUB_URLS: { [key: string]: string } = {
+  mf: 'https://github.com/metroidret/mf/tree/' + GIT_COMMIT_MF + '/',
+  zm: 'https://github.com/metroidret/mzm/tree/' + GIT_COMMIT_ZM + '/',
+};
 
 const URL_GAME = 'game';
 const URL_MAP = 'map';
@@ -793,6 +801,7 @@ export class MapApp extends LitElement {
     const highlightRegex = this.getHighlightRegex();
     return html`<map-table
       .tableType="${this.tableType}"
+      .githubUrl="${GITHUB_URLS[this.game]}"
       .entries="${this.filterData.slice(firstRow, lastRow)}"
       .structs="${this.structs}"
       .unions="${this.unions}"

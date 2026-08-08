@@ -13,10 +13,6 @@ import {
 } from './constants';
 import { TypeSpecKind } from './asset-type';
 
-const COMMIT_HASH = '08d51a9f368a05050b953208ff3505fbe13c54d7';
-const BASE_URL = 'https://github.com/metroidret/mzm/tree/';
-const FULL_URL = BASE_URL + COMMIT_HASH + '/';
-
 const grayBorder = css`1px solid #808080`;
 const font = css`Menlo, Monaco, "Courier New", monospace`;
 
@@ -140,6 +136,8 @@ export class MapTable extends LitElement {
 
   /** The type of data to display in the table */
   @property({ type: Number }) tableType: TableType = TableType.None;
+  /** URL to the github repo on a specific commit */
+  @property({ type: String }) githubUrl = '';
   /** The JSON data to render */
   @property({ type: Array }) entries: InfoEntry[] = [];
   /** All struct definitions in the game */
@@ -356,7 +354,7 @@ export class MapTable extends LitElement {
     const toggleAndTable = canHaveSubTable ? this.renderToggleAndTable(entry) : '';
     let span;
     if (loc) {
-      const url = FULL_URL + loc.replace(':', '#L');
+      const url = this.githubUrl + loc.replace(':', '#L');
       span = html`<a href=${url} target="_blank" class="name-span">${inner}</a>`;
     } else {
       span = html`<span class="name-span">${inner}</span>`;
