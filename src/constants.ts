@@ -1,9 +1,9 @@
 
 export const GAMES = [
-  // {
-  //   name: 'Metroid Fusion',
-  //   value: 'mf',
-  // },
+  {
+    name: 'Metroid Fusion',
+    value: 'mf',
+  },
   {
     name: 'Metroid Zero Mission',
     value: 'zm',

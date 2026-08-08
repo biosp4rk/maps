@@ -9,7 +9,7 @@ Source code for app at [labk.org/maps](https://labk.org/maps/)
 - Search for address ranges by putting `>`, `<`, `>=`, or `<=` before a hex address
 - Search for entries near an address by putting `~` before a hex address
 - Search for regex patterns by putting `/` around the pattern
-- Put `-` before a term, ordered terms, or pattern to exclude it from the results
+- Put `-` before a term or pattern to exclude it from the results
 - Clear a filter by pressing `esc`
 
 ### Examples
