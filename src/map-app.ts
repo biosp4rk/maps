@@ -564,16 +564,22 @@ export class MapApp extends LitElement {
 
   private handleNearAddrFilter(item: FilterItem) {
     const target = item.addr!
-    // Find index of first entry past address
-    // TODO: Binary search
-    let idx = this.filterData.findIndex(
-      entry => entry.sortValue() > target);
-    let exact = false;
-    if (idx === -1) {
-      idx = this.filterData.length;
+    // Find index of first entry past address using binary search
+    const numEntries = this.filterData.length;
+    let low = 0;
+    let high = numEntries;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (this.filterData[mid].sortValue() > target) {
+        high = mid;
+      } else {
+        low = mid + 1;
+      }
     }
+    const idx = low;
+    // Check if exact match
+    let exact = false;
     if (idx - 1 >= 0) {
-      // Check if exact match
       let addr;
       let size;
       const entry = this.filterData[idx - 1];
@@ -595,7 +601,6 @@ export class MapApp extends LitElement {
     if (exact) { left--; }
     if (left < 0) { left = 0; }
     let right = idx;
-    const numEntries = this.filterData.length;
     if (right >= numEntries) {
       right = numEntries - 1;
     }
