@@ -258,7 +258,7 @@ export class MapTable extends LitElement {
       title="${toolTip}">${lenStr}</td>`;
   }
 
-  private hasSubTable(entry: InfoEntry): Boolean {
+  private hasSubTable(entry: InfoEntry): boolean {
     if (entry instanceof VarEntry) {
       const ve = entry as VarEntry;
       return ((ve.enum && ve.enum! in this.enums) ||

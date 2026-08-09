@@ -295,23 +295,18 @@ export class MapApp extends LitElement {
     // Read data from json files
     this.fetchingData = true;
     const promises = [];
-    let structProm: Promise<any>;
-    let unionProm: Promise<any>;
-    let enumProm: Promise<any>;
-    let typedefsProm: Promise<any>;
-    let dataProm: Promise<any>;
 
     if (first || gameChanged) {
-      structProm = fetch(this.getJsonUrl('structs'));
-      unionProm = fetch(this.getJsonUrl('unions'));
-      enumProm = fetch(this.getJsonUrl('enums'));
-      typedefsProm = fetch(this.getJsonUrl('typedefs'));
-      promises.push(structProm, unionProm, enumProm, typedefsProm);
+      promises.push(
+        fetch(this.getJsonUrl('structs')),
+        fetch(this.getJsonUrl('unions')),
+        fetch(this.getJsonUrl('enums')),
+        fetch(this.getJsonUrl('typedefs'))
+      );
     }
 
     if (this.tableHasAddr()) {
-      dataProm = fetch(this.getJsonUrl(this.map));
-      promises.push(dataProm);
+      promises.push(fetch(this.getJsonUrl(this.map)));
     }
 
     const responses = await Promise.all(promises);
@@ -744,11 +739,11 @@ export class MapApp extends LitElement {
     this.tableType = getMainTableType(map);
   }
 
-  private tableIs(...tableTypes: TableType[]): Boolean {
+  private tableIs(...tableTypes: TableType[]): boolean {
     return tableTypes.includes(this.tableType);
   }
 
-  private tableHasAddr(): Boolean {
+  private tableHasAddr(): boolean {
     return this.tableIs(
       TableType.RamList,
       TableType.CodeList,

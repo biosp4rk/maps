@@ -115,6 +115,14 @@ const HEADINGS: { [key: string]: string } = {
   [KEY_VARS]: HEAD_VARS
 };
 
+const HIDEABLE: { [k in TableType]?: string[] } = {
+  [TableType.RamList]:  [KEY_LEN, KEY_CAT, KEY_TYPE, KEY_DESC],
+  [TableType.DataList]: [KEY_LEN, KEY_CAT, KEY_TYPE, KEY_DESC],
+  [TableType.CodeList]: [KEY_LEN, KEY_PARAMS, KEY_RET, KEY_DESC],
+  [TableType.StructList]: [KEY_SIZE, KEY_DESC],
+  [TableType.EnumList]: [KEY_DESC],
+};
+
 export const CATEGORIES: { [key: string]: string } = {
   'bool': 'Boolean',
   'flags': 'Flags',
@@ -154,63 +162,6 @@ export function getHeading(key: string): string {
   return HEADINGS[key];
 }
 
-export function getHideableColumns(tableType: TableType): { head: string; key: string; }[] {
-  if (tableType === TableType.RamList || tableType === TableType.DataList) {
-    return [
-      {
-        head: HEAD_LEN,
-        key: KEY_LEN
-      },
-      {
-        head: HEAD_CAT,
-        key: KEY_CAT
-      },
-      {
-        head: HEAD_TYPE,
-        key: KEY_TYPE
-      },
-      {
-        head: HEAD_DESC,
-        key: KEY_DESC
-      }
-    ];
-  } else if (tableType === TableType.CodeList) {
-    return [
-      {
-        head: HEAD_LEN,
-        key: KEY_LEN
-      },
-      {
-        head: HEAD_PARAMS,
-        key: KEY_PARAMS
-      },
-      {
-        head: HEAD_RET,
-        key: KEY_RET
-      },
-      {
-        head: HEAD_DESC,
-        key: KEY_DESC
-      }
-    ];
-  } else if (tableType === TableType.StructList) {
-    return [
-      {
-        head: HEAD_SIZE,
-        key: KEY_SIZE
-      },
-      {
-        head: HEAD_DESC,
-        key: KEY_DESC
-      }
-    ];
-  } else if (tableType === TableType.EnumList) {
-    return [
-      {
-        head: HEAD_DESC,
-        key: KEY_DESC
-      }
-    ];
-  }
-  return [];
+export function getHideableColumns(t: TableType): { head: string; key: string; }[] {
+  return (HIDEABLE[t] ?? []).map(key => ({ head: getHeading(key), key }));
 }
