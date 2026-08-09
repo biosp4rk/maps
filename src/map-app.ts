@@ -323,17 +323,21 @@ export class MapApp extends LitElement {
       // Get structs
       this.structs = {};
       for (const entry of structJson) {
-        this.structs[entry[KEY_NAME]] = new StructEntry(entry)
+        this.structs[entry[KEY_NAME]] = new StructEntry(entry);
       }
       // Get unions
       this.unions = {};
       for (const entry of unionJson) {
-        this.unions[entry[KEY_NAME]] = new UnionEntry(entry)
+        this.unions[entry[KEY_NAME]] = new UnionEntry(entry);
       }
       // Get enums
       this.enums = {};
       for (const entry of enumJson) {
-        this.enums[entry[KEY_NAME]] = new EnumEntry(entry)
+        let name = entry[KEY_NAME] as string;
+        // Strip trailing underscore
+        name = name.endsWith('_') ? name.slice(0, -1) : name
+        entry[KEY_NAME] = name;
+        this.enums[name] = new EnumEntry(entry);
       }
       // Get typedefs
       this.typedefs = {};
@@ -389,8 +393,8 @@ export class MapApp extends LitElement {
           throw new Error(`Invalid table type ${this.tableType}`);
       }
       this.allData = Object.values(entries).sort((a, b) => {
-        if (a < b) { return -1; }
-        if (a > b) { return 1; }
+        if (a.name < b.name) { return -1; }
+        if (a.name > b.name) { return 1; }
         return 0;
       });
     }

@@ -261,7 +261,8 @@ export class MapTable extends LitElement {
   private hasSubTable(entry: InfoEntry): Boolean {
     if (entry instanceof VarEntry) {
       const ve = entry as VarEntry;
-      return (Boolean(ve.enum) ||
+      return ((ve.enum && ve.enum! in this.enums) ||
+        ve.specName() in this.enums ||
         ve.specKind === TypeSpecKind.Struct ||
         ve.specKind === TypeSpecKind.Union);
     } else if (entry instanceof StructEntry ||
@@ -275,8 +276,12 @@ export class MapTable extends LitElement {
   private renderSubTable(entry: InfoEntry) {
     if (entry instanceof VarEntry) {
       const ve = entry as VarEntry;
+      // TODO: Deprecate enum fields once they all have enum typedefs
       if (ve.enum && ve.enum! in this.enums) {
         const ee: EnumEntry = this.enums[ve.enum!];
+        return this.renderEnumDef(ee);
+      } else if (ve.specName() in this.enums) {
+        const ee: EnumEntry = this.enums[ve.specName()];
         return this.renderEnumDef(ee);
       } else if (ve.specKind === TypeSpecKind.Struct) {
         const se = this.structs[ve.specName()];
