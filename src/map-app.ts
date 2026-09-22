@@ -1,16 +1,17 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, PropertyValues } from 'lit';
 import { state, customElement } from 'lit/decorators.js';
 import {
-  GAMES, MAPS, TableType, REGIONS, KEY_CAT, KEY_NAME, KEY_DESC,
-  getMainTableType, getHideableColumns
+  GAMES, MAPS, TableType, REGIONS, GAME_SHORTCUTS, MAP_SHORTCUTS, REGION_SHORTCUTS,
+  KEY_CAT, KEY_NAME, KEY_DESC, getMainTableType, getHideableColumns
 } from './constants';
+import { TypeSpecKind, AssetType, SpecifierType, PointerType, ArrayType, FunctionType } from './asset-type';
 import {
   DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
   DataEntry, CodeEntry,  StructEntry, UnionEntry, EnumEntry, TypedefEntry
 } from './info-entry';
 import { FilterItem, FilterParser, FilterType } from './filter-parser';
 import "./map-table";
-import { TypeSpecKind, AssetType, SpecifierType, PointerType, ArrayType, FunctionType } from './asset-type';
+import "./map-shortcuts";
 
 const VERSION = 6;
 
@@ -60,6 +61,20 @@ export class MapApp extends LitElement {
     select {
       background: black;
       color: #f0f0f0;
+      border: 1px solid #606060;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 4px 7px;
+    }
+
+    input {
+      padding: 3px 5px;
+    }
+
+    select {
+      padding: 3px 2px;
     }
 
     li {
@@ -162,6 +177,9 @@ export class MapApp extends LitElement {
   /** Hide table while fetching data */
   @state()
   private fetchingData = false;
+  /** Show pop-up with keyboard shortcuts */
+  @state()
+  private showShortcuts = false;
 
   // Data fields
   /** All struct definitions in the game */
@@ -186,20 +204,30 @@ export class MapApp extends LitElement {
   private hiddenColumns: Set<string> = new Set<string>([KEY_CAT, KEY_DESC]);
   private pageSize: number = 1000;
   private pageIndex: number = 0;
+  private pendingShortcut: string = '';
+  private resetTimer: number | undefined = undefined;
 
   constructor() {
     super();
     this.parseUrlParams();
     this.fetchData(true, true, false);
-    document.body.addEventListener('keyup', (e: Event) => {
-      if ((e as KeyboardEvent).key == 'Escape') {
-        this.resetFilter();
-      }
-    });
+    document.body.addEventListener('keydown', (e: Event) => this.handleKeyDown(e));
   }
 
   override firstUpdated() {
     this.setFilterText(this.filter);
+  }
+
+  protected override willUpdate(changedProperties: PropertyValues): void {
+    const gameChanged = changedProperties.get('game') !== undefined;
+    const mapChanged = changedProperties.get('map') !== undefined;
+    const regionChanged = changedProperties.get('region') !== undefined;
+    if (gameChanged || mapChanged || regionChanged) {
+      if (mapChanged) {
+        this.tableType = getMainTableType(this.map);
+      }
+      this.fetchData(false, gameChanged, regionChanged);
+    }
   }
 
   private parseUrlParams() {
@@ -457,9 +485,59 @@ export class MapApp extends LitElement {
     }
   }
 
-  private inputHandler(e: Event) {
+  private handleKeyDown(e: Event) {
+    // Check to clear filter
+    const key = (e as KeyboardEvent).key;
+    if (key === 'Escape') {
+      if (this.showShortcuts) {
+        this.showShortcuts = false;
+      } else {
+        this.resetFilter();
+      }
+      return;
+    }
+    // Ignore keys when typing a filter
+    const el = this.shadowRoot!.activeElement as HTMLElement;
+    if (el?.matches("input, textarea, [contenteditable='true']")) {
+      return;
+    }
+    // Check to toggle keyboard shortcuts pop-up
+    if (key === '?') {
+      this.showShortcuts = !this.showShortcuts;
+      return;
+    }
+    // Check shortcuts to switch between game, map, and region
+    if (!this.pendingShortcut) {
+      if (key === 'g' || key === 'm' || key === 'r') {
+        this.pendingShortcut = key;
+        clearTimeout(this.resetTimer);
+        this.resetTimer = setTimeout(() => this.pendingShortcut = '', 1500);
+      }
+    } else {
+      if (this.pendingShortcut === 'g') {
+        const game = GAME_SHORTCUTS[key];
+        if (game) {
+          this.game = game;
+        }
+      } else if (this.pendingShortcut === 'm') {
+        const map = MAP_SHORTCUTS[key];
+        if (map) {
+          this.map = map;
+        }
+      } else if (this.pendingShortcut === 'r') {
+        const region = REGION_SHORTCUTS[key];
+        if (region) {
+          this.region = region;
+        }
+      }
+      this.pendingShortcut = '';
+      clearTimeout(this.resetTimer);
+    }
+  }
+
+  private filterKeyUp(e: Event) {
     let ke = (e as KeyboardEvent);
-    if (ke.key == 'Enter') {
+    if (ke.key === 'Enter') {
       this.userApplyFilter();
     }
   }
@@ -716,14 +794,12 @@ export class MapApp extends LitElement {
     this.game =
       (this.shadowRoot!.querySelector('#game-select')! as HTMLInputElement)
         .value;
-    this.fetchData(false, true, false);
   }
 
   private regionChangeHandler() {
     this.region =
       (this.shadowRoot!.querySelector('#region-select')! as HTMLInputElement)
         .value;
-    this.fetchData(false, false, true);
   }
 
   private mapChangeHandler() {
@@ -731,7 +807,6 @@ export class MapApp extends LitElement {
       (this.shadowRoot!.querySelector('#map-select')! as HTMLInputElement)
         .value;
     this.setMapType(map);
-    this.fetchData(false, false, false);
   }
 
   private setMapType(map: string) {
@@ -823,20 +898,20 @@ export class MapApp extends LitElement {
         <div id="banner">
           <div id="options">
             <div id="selectors">
-              <select id="game-select" @change="${this.gameChangeHandler}">
+              <select id="game-select" .value=${this.game} @change="${this.gameChangeHandler}">
                 ${GAMES.map(game => html`<option value="${game.value}" ?selected="${this.game == game.value}">${game.name}</option>`)}
               </select>
-              <select id="map-select" @change="${this.mapChangeHandler}">
-                  ${MAPS.map(map => html`<option value="${map.value}" ?selected="${this.map == map.value}">${map.name}</option>`)}
+              <select id="map-select" .value=${this.map} @change="${this.mapChangeHandler}">
+                ${MAPS.map(map => html`<option value="${map.value}" ?selected="${this.map == map.value}">${map.name}</option>`)}
               </select>
-              <select id="region-select" @change="${this.regionChangeHandler}">
+              <select id="region-select" .value=${this.region} @change="${this.regionChangeHandler}">
                 ${REGIONS.map(reg => html`<option value="${reg}" ?selected="${this.region == reg}">${reg}</option>`)}
               </select>
             </div>
             <div id="filter">
               <div id="filter-search">
                 Filter:
-                <input class="search-box" @keyup='${this.inputHandler}'/>
+                <input class="search-box" @keyup='${this.filterKeyUp}'/>
               </div>
               <div>
                 <button @click="${this.userApplyFilter}">Apply</button>
@@ -871,6 +946,8 @@ export class MapApp extends LitElement {
           ${this.renderPageNav()}
         </div>
         ${this.renderTable()}
+        <map-shortcuts .open="${this.showShortcuts}"
+          @close="${() => this.showShortcuts = false}"></map-shortcuts>
       </div>`;
   }
 }

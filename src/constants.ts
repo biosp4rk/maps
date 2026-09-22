@@ -65,6 +65,28 @@ export enum TableType {
 
 export const REGIONS = ['U', 'E', 'J', 'C'];
 
+export const GAME_SHORTCUTS: { [key: string]: string } = {
+  f: 'mf',
+  z: 'zm',
+};
+
+export const MAP_SHORTCUTS: { [key: string]: string } = {
+  r: 'ram',
+  c: 'code',
+  d: 'data',
+  s: 'structs',
+  u: 'unions',
+  e: 'enums',
+  t: 'typedefs',
+};
+
+export const REGION_SHORTCUTS: { [key: string]: string } = {
+  u: 'U',
+  e: 'E',
+  j: 'J',
+  c: 'C',
+};
+
 export const KEY_ADDR = 'addr';
 export const KEY_BITS = 'bits';
 export const KEY_CAT = 'cat';
