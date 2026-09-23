@@ -68,13 +68,11 @@ export class MapApp extends LitElement {
     button {
       padding: 4px 7px;
     }
-
     input {
       padding: 3px 5px;
     }
-
     select {
-      padding: 3px 2px;
+      padding: 2px 2px;
     }
 
     li {

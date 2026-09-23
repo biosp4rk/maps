@@ -250,9 +250,22 @@ export class MapTable extends LitElement {
     if (this.hiddenColumns.has(KEY_LEN)) {
       return '';
     }
-    const len = entry.getLength(this.sizes);
-    const lenStr = len !== 0 ? toHex(entry.getLength(this.sizes)) : '?';
-    const toolTip = entry.getLengthToolTip(this.sizes);
+    let lenStr;
+    let toolTip;
+    try {
+      const len = entry.getLength(this.sizes);
+      lenStr = len !== 0 ? toHex(len) : '?';
+      toolTip = entry.getLengthToolTip(this.sizes);
+    } catch (error) {
+      const name = entry instanceof NamedVarEntry ? entry.name : 'variable';
+      let msg = `Error getting length of ${name}`;
+      if (error instanceof Error) {
+        msg = `${msg}: ${error.message}`;
+      }
+      console.log(msg);
+      lenStr = '?';
+      toolTip = '';
+    }
     return html`<td
       class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
       title="${toolTip}">${lenStr}</td>`;
@@ -261,10 +274,14 @@ export class MapTable extends LitElement {
   private hasSubTable(entry: InfoEntry): boolean {
     if (entry instanceof VarEntry) {
       const ve = entry as VarEntry;
-      return ((ve.enum && ve.enum! in this.enums) ||
-        ve.specName() in this.enums ||
-        ve.specKind === TypeSpecKind.Struct ||
-        ve.specKind === TypeSpecKind.Union);
+      const specName = ve.specName();
+      if ((ve.enum && ve.enum! in this.enums) || specName in this.enums) {
+        return true;
+      } else if (ve.specKind === TypeSpecKind.Struct) {
+        return specName in this.structs;
+      } else if (ve.specKind === TypeSpecKind.Union) {
+        return specName in this.unions;
+      }
     } else if (entry instanceof StructEntry ||
       entry instanceof UnionEntry ||
       entry instanceof EnumEntry) {
