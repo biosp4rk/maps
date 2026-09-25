@@ -270,14 +270,6 @@ class CodeEntry extends InfoEntry {
     const funcEnd = this.addr + this.size - 1;
     return 'Ends at ' + toHex(funcEnd);
   }
-
-  getParams(): string {
-    return '';
-  }
-
-  getReturn(): string {
-    return '';
-  }
 }
 
 class StructVarEntry extends NamedVarEntry {

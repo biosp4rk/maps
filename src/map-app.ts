@@ -1,21 +1,22 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, PropertyValues } from 'lit';
 import { state, customElement } from 'lit/decorators.js';
 import {
-  GAMES, MAPS, TableType, REGIONS, KEY_CAT, KEY_NAME, KEY_DESC,
-  getMainTableType, getHideableColumns
+  GAMES, MAPS, TableType, REGIONS, GAME_SHORTCUTS, MAP_SHORTCUTS, REGION_SHORTCUTS,
+  KEY_CAT, KEY_NAME, KEY_DESC, getMainTableType, getHideableColumns
 } from './constants';
+import { TypeSpecKind, AssetType, SpecifierType, PointerType, ArrayType, FunctionType } from './asset-type';
 import {
   DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
   DataEntry, CodeEntry,  StructEntry, UnionEntry, EnumEntry, TypedefEntry
 } from './info-entry';
 import { FilterItem, FilterParser, FilterType } from './filter-parser';
 import "./map-table";
-import { TypeSpecKind, AssetType, SpecifierType, PointerType, ArrayType, FunctionType } from './asset-type';
+import "./map-shortcuts";
 
-const VERSION = 6;
+const VERSION = 7;
 
-const GIT_COMMIT_MF = '47234f39e85ccefecd5d5125d9a711fa726b1a2c';
-const GIT_COMMIT_ZM = '72a40125ad9e1b790e967c8fe053bf6fc86c3fab';
+const GIT_COMMIT_MF = 'b9245f582ae2ed434332486149e0ed2a37817657';
+const GIT_COMMIT_ZM = '43b7fd52f552e4d38c1521ff9d4df5ee57e61493';
 
 const GITHUB_URLS: { [key: string]: string } = {
   mf: 'https://github.com/metroidret/mf/tree/' + GIT_COMMIT_MF + '/',
@@ -60,6 +61,18 @@ export class MapApp extends LitElement {
     select {
       background: black;
       color: #f0f0f0;
+      border: 1px solid #606060;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 4px 7px;
+    }
+    input {
+      padding: 3px 5px;
+    }
+    select {
+      padding: 2px 2px;
     }
 
     li {
@@ -162,6 +175,9 @@ export class MapApp extends LitElement {
   /** Hide table while fetching data */
   @state()
   private fetchingData = false;
+  /** Show pop-up with keyboard shortcuts */
+  @state()
+  private showShortcuts = false;
 
   // Data fields
   /** All struct definitions in the game */
@@ -186,20 +202,30 @@ export class MapApp extends LitElement {
   private hiddenColumns: Set<string> = new Set<string>([KEY_CAT, KEY_DESC]);
   private pageSize: number = 1000;
   private pageIndex: number = 0;
+  private pendingShortcut: string = '';
+  private resetTimer: number | undefined = undefined;
 
   constructor() {
     super();
     this.parseUrlParams();
     this.fetchData(true, true, false);
-    document.body.addEventListener('keyup', (e: Event) => {
-      if ((e as KeyboardEvent).key == 'Escape') {
-        this.resetFilter();
-      }
-    });
+    document.body.addEventListener('keydown', (e: Event) => this.handleKeyDown(e));
   }
 
   override firstUpdated() {
     this.setFilterText(this.filter);
+  }
+
+  protected override willUpdate(changedProperties: PropertyValues): void {
+    const gameChanged = changedProperties.get('game') !== undefined;
+    const mapChanged = changedProperties.get('map') !== undefined;
+    const regionChanged = changedProperties.get('region') !== undefined;
+    if (gameChanged || mapChanged || regionChanged) {
+      if (mapChanged) {
+        this.tableType = getMainTableType(this.map);
+      }
+      this.fetchData(false, gameChanged, regionChanged);
+    }
   }
 
   private parseUrlParams() {
@@ -295,23 +321,18 @@ export class MapApp extends LitElement {
     // Read data from json files
     this.fetchingData = true;
     const promises = [];
-    let structProm: Promise<any>;
-    let unionProm: Promise<any>;
-    let enumProm: Promise<any>;
-    let typedefsProm: Promise<any>;
-    let dataProm: Promise<any>;
 
     if (first || gameChanged) {
-      structProm = fetch(this.getJsonUrl('structs'));
-      unionProm = fetch(this.getJsonUrl('unions'));
-      enumProm = fetch(this.getJsonUrl('enums'));
-      typedefsProm = fetch(this.getJsonUrl('typedefs'));
-      promises.push(structProm, unionProm, enumProm, typedefsProm);
+      promises.push(
+        fetch(this.getJsonUrl('structs')),
+        fetch(this.getJsonUrl('unions')),
+        fetch(this.getJsonUrl('enums')),
+        fetch(this.getJsonUrl('typedefs'))
+      );
     }
 
     if (this.tableHasAddr()) {
-      dataProm = fetch(this.getJsonUrl(this.map));
-      promises.push(dataProm);
+      promises.push(fetch(this.getJsonUrl(this.map)));
     }
 
     const responses = await Promise.all(promises);
@@ -323,17 +344,21 @@ export class MapApp extends LitElement {
       // Get structs
       this.structs = {};
       for (const entry of structJson) {
-        this.structs[entry[KEY_NAME]] = new StructEntry(entry)
+        this.structs[entry[KEY_NAME]] = new StructEntry(entry);
       }
       // Get unions
       this.unions = {};
       for (const entry of unionJson) {
-        this.unions[entry[KEY_NAME]] = new UnionEntry(entry)
+        this.unions[entry[KEY_NAME]] = new UnionEntry(entry);
       }
       // Get enums
       this.enums = {};
       for (const entry of enumJson) {
-        this.enums[entry[KEY_NAME]] = new EnumEntry(entry)
+        let name = entry[KEY_NAME] as string;
+        // Strip trailing underscore
+        name = name.endsWith('_') ? name.slice(0, -1) : name
+        entry[KEY_NAME] = name;
+        this.enums[name] = new EnumEntry(entry);
       }
       // Get typedefs
       this.typedefs = {};
@@ -389,8 +414,8 @@ export class MapApp extends LitElement {
           throw new Error(`Invalid table type ${this.tableType}`);
       }
       this.allData = Object.values(entries).sort((a, b) => {
-        if (a < b) { return -1; }
-        if (a > b) { return 1; }
+        if (a.name < b.name) { return -1; }
+        if (a.name > b.name) { return 1; }
         return 0;
       });
     }
@@ -458,9 +483,59 @@ export class MapApp extends LitElement {
     }
   }
 
-  private inputHandler(e: Event) {
+  private handleKeyDown(e: Event) {
+    // Check to clear filter
+    const key = (e as KeyboardEvent).key;
+    if (key === 'Escape') {
+      if (this.showShortcuts) {
+        this.showShortcuts = false;
+      } else {
+        this.resetFilter();
+      }
+      return;
+    }
+    // Ignore keys when typing a filter
+    const el = this.shadowRoot!.activeElement as HTMLElement;
+    if (el?.matches("input, textarea, [contenteditable='true']")) {
+      return;
+    }
+    // Check to toggle keyboard shortcuts pop-up
+    if (key === '?') {
+      this.showShortcuts = !this.showShortcuts;
+      return;
+    }
+    // Check shortcuts to switch between game, map, and region
+    if (!this.pendingShortcut) {
+      if (key === 'g' || key === 'm' || key === 'r') {
+        this.pendingShortcut = key;
+        clearTimeout(this.resetTimer);
+        this.resetTimer = setTimeout(() => this.pendingShortcut = '', 1500);
+      }
+    } else {
+      if (this.pendingShortcut === 'g') {
+        const game = GAME_SHORTCUTS[key];
+        if (game) {
+          this.game = game;
+        }
+      } else if (this.pendingShortcut === 'm') {
+        const map = MAP_SHORTCUTS[key];
+        if (map) {
+          this.map = map;
+        }
+      } else if (this.pendingShortcut === 'r') {
+        const region = REGION_SHORTCUTS[key];
+        if (region) {
+          this.region = region;
+        }
+      }
+      this.pendingShortcut = '';
+      clearTimeout(this.resetTimer);
+    }
+  }
+
+  private filterKeyUp(e: Event) {
     let ke = (e as KeyboardEvent);
-    if (ke.key == 'Enter') {
+    if (ke.key === 'Enter') {
       this.userApplyFilter();
     }
   }
@@ -560,16 +635,22 @@ export class MapApp extends LitElement {
 
   private handleNearAddrFilter(item: FilterItem) {
     const target = item.addr!
-    // Find index of first entry past address
-    // TODO: Binary search
-    let idx = this.filterData.findIndex(
-      entry => entry.sortValue() > target);
-    let exact = false;
-    if (idx === -1) {
-      idx = this.filterData.length;
+    // Find index of first entry past address using binary search
+    const numEntries = this.filterData.length;
+    let low = 0;
+    let high = numEntries;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (this.filterData[mid].sortValue() > target) {
+        high = mid;
+      } else {
+        low = mid + 1;
+      }
     }
+    const idx = low;
+    // Check if exact match
+    let exact = false;
     if (idx - 1 >= 0) {
-      // Check if exact match
       let addr;
       let size;
       const entry = this.filterData[idx - 1];
@@ -591,7 +672,6 @@ export class MapApp extends LitElement {
     if (exact) { left--; }
     if (left < 0) { left = 0; }
     let right = idx;
-    const numEntries = this.filterData.length;
     if (right >= numEntries) {
       right = numEntries - 1;
     }
@@ -712,14 +792,12 @@ export class MapApp extends LitElement {
     this.game =
       (this.shadowRoot!.querySelector('#game-select')! as HTMLInputElement)
         .value;
-    this.fetchData(false, true, false);
   }
 
   private regionChangeHandler() {
     this.region =
       (this.shadowRoot!.querySelector('#region-select')! as HTMLInputElement)
         .value;
-    this.fetchData(false, false, true);
   }
 
   private mapChangeHandler() {
@@ -727,7 +805,6 @@ export class MapApp extends LitElement {
       (this.shadowRoot!.querySelector('#map-select')! as HTMLInputElement)
         .value;
     this.setMapType(map);
-    this.fetchData(false, false, false);
   }
 
   private setMapType(map: string) {
@@ -735,11 +812,11 @@ export class MapApp extends LitElement {
     this.tableType = getMainTableType(map);
   }
 
-  private tableIs(...tableTypes: TableType[]): Boolean {
+  private tableIs(...tableTypes: TableType[]): boolean {
     return tableTypes.includes(this.tableType);
   }
 
-  private tableHasAddr(): Boolean {
+  private tableHasAddr(): boolean {
     return this.tableIs(
       TableType.RamList,
       TableType.CodeList,
@@ -819,20 +896,20 @@ export class MapApp extends LitElement {
         <div id="banner">
           <div id="options">
             <div id="selectors">
-              <select id="game-select" @change="${this.gameChangeHandler}">
+              <select id="game-select" .value=${this.game} @change="${this.gameChangeHandler}">
                 ${GAMES.map(game => html`<option value="${game.value}" ?selected="${this.game == game.value}">${game.name}</option>`)}
               </select>
-              <select id="map-select" @change="${this.mapChangeHandler}">
-                  ${MAPS.map(map => html`<option value="${map.value}" ?selected="${this.map == map.value}">${map.name}</option>`)}
+              <select id="map-select" .value=${this.map} @change="${this.mapChangeHandler}">
+                ${MAPS.map(map => html`<option value="${map.value}" ?selected="${this.map == map.value}">${map.name}</option>`)}
               </select>
-              <select id="region-select" @change="${this.regionChangeHandler}">
+              <select id="region-select" .value=${this.region} @change="${this.regionChangeHandler}">
                 ${REGIONS.map(reg => html`<option value="${reg}" ?selected="${this.region == reg}">${reg}</option>`)}
               </select>
             </div>
             <div id="filter">
               <div id="filter-search">
                 Filter:
-                <input class="search-box" @keyup='${this.inputHandler}'/>
+                <input class="search-box" @keyup='${this.filterKeyUp}'/>
               </div>
               <div>
                 <button @click="${this.userApplyFilter}">Apply</button>
@@ -867,6 +944,8 @@ export class MapApp extends LitElement {
           ${this.renderPageNav()}
         </div>
         ${this.renderTable()}
+        <map-shortcuts .open="${this.showShortcuts}"
+          @close="${() => this.showShortcuts = false}"></map-shortcuts>
       </div>`;
   }
 }

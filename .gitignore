@@ -18,6 +18,11 @@ custom-elements.json
 /map-table.d.ts
 /map-table.d.ts.map
 
+/map-shortcuts.js
+/map-shortcuts.js.map
+/map-shortcuts.d.ts
+/map-shortcuts.d.ts.map
+
 /constants.js
 /constants.js.map
 /constants.d.ts

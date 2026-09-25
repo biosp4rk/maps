@@ -75,7 +75,7 @@ export class FilterParser {
         case FilterType.AddrLE:
         case FilterType.AddrNear:
           // Exclude addr filter if not valid hex
-          if (!/(0x)?[0-9A-Fa-f]+/.test(item.term)) {
+          if (!/^(0x)?[0-9A-Fa-f]+$/.test(item.term)) {
             continue;
           }
           item.addr = parseInt(item.term, 16);
