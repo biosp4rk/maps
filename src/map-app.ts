@@ -13,10 +13,10 @@ import { FilterItem, FilterParser, FilterType } from './filter-parser';
 import "./map-table";
 import "./map-shortcuts";
 
-const VERSION = 6;
+const VERSION = 7;
 
-const GIT_COMMIT_MF = '47234f39e85ccefecd5d5125d9a711fa726b1a2c';
-const GIT_COMMIT_ZM = '72a40125ad9e1b790e967c8fe053bf6fc86c3fab';
+const GIT_COMMIT_MF = 'b9245f582ae2ed434332486149e0ed2a37817657';
+const GIT_COMMIT_ZM = '43b7fd52f552e4d38c1521ff9d4df5ee57e61493';
 
 const GITHUB_URLS: { [key: string]: string } = {
   mf: 'https://github.com/metroidret/mf/tree/' + GIT_COMMIT_MF + '/',
