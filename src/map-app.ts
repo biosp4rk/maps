@@ -509,7 +509,7 @@ export class MapApp extends LitElement {
       if (key === 'g' || key === 'm' || key === 'r') {
         this.pendingShortcut = key;
         clearTimeout(this.resetTimer);
-        this.resetTimer = setTimeout(() => this.pendingShortcut = '', 1500);
+        this.resetTimer = window.setTimeout(() => this.pendingShortcut = '', 1500);
       }
     } else {
       if (this.pendingShortcut === 'g') {
