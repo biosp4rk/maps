@@ -1,4 +1,4 @@
-import { TableType } from './constants';
+import { TableType, tableHasAddr } from './constants';
 import { TypeSpecKind } from './asset-type';
 import {
   NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict,
@@ -32,12 +32,12 @@ export class FilterEngine {
         case FilterType.AddrLT:
         case FilterType.AddrGE:
         case FilterType.AddrLE:
-          data = this.tableHasAddr()
+          data = tableHasAddr(this.ctx.tableType)
             ? data.filter(entry => this.checkAddrFilter(entry.sortValue(), item))
             : [];
           break;
         case FilterType.AddrNear:
-          data = this.tableHasAddr() ? this.handleNearAddrFilter(data, item) : [];
+          data = tableHasAddr(this.ctx.tableType) ? this.handleNearAddrFilter(data, item) : [];
           break;
       }
     }
@@ -55,18 +55,10 @@ export class FilterEngine {
     return new RegExp(highlightItems.map(i => i.term).join('|'), 'gi');
   }
 
-  private tableIs(...tableTypes: TableType[]): boolean {
-    return tableTypes.includes(this.ctx.tableType);
-  }
-
-  private tableHasAddr(): boolean {
-    return this.tableIs(TableType.RamList, TableType.CodeList, TableType.DataList);
-  }
-
   private matchesName(entry: NamedEntry, item: FilterItem): boolean {
     let suName = undefined;
     let eName = undefined;
-    if (this.tableIs(TableType.RamList, TableType.DataList)) {
+    if (this.ctx.tableType === TableType.RamList || this.ctx.tableType === TableType.DataList) {
       const de = entry as DataEntry;
       if (this.ctx.searchStructsUnions &&
         (de.specKind === TypeSpecKind.Struct || de.specKind === TypeSpecKind.Union)) {
@@ -75,9 +67,9 @@ export class FilterEngine {
       if (this.ctx.searchEnums) {
         eName = de.enum;
       }
-    } else if (this.tableIs(TableType.StructList) && this.ctx.searchStructsUnions) {
+    } else if (this.ctx.tableType === TableType.StructList && this.ctx.searchStructsUnions) {
       suName = (entry as StructEntry).name;
-    } else if (this.tableIs(TableType.EnumList) && this.ctx.searchEnums) {
+    } else if (this.ctx.tableType === TableType.EnumList && this.ctx.searchEnums) {
       eName = (entry as EnumEntry).name;
     }
     return this.checkNameFilter(entry.name, item, suName, eName);
@@ -173,7 +165,7 @@ export class FilterEngine {
       let addr;
       let size;
       const entry = data[idx - 1];
-      if (this.tableIs(TableType.CodeList)) {
+      if (this.ctx.tableType === TableType.CodeList) {
         const ce = entry as CodeEntry;
         addr = ce.addr;
         size = ce.size;

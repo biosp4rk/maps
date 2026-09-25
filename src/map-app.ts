@@ -2,19 +2,16 @@ import { LitElement, html, css, PropertyValues } from 'lit';
 import { state, customElement } from 'lit/decorators.js';
 import {
   GAMES, MAPS, TableType, REGIONS, GAME_SHORTCUTS, MAP_SHORTCUTS, REGION_SHORTCUTS,
-  KEY_CAT, KEY_NAME, KEY_DESC, getMainTableType, getHideableColumns
+  KEY_CAT, KEY_DESC, getMainTableType, getHideableColumns
 } from './constants';
-import { TypeSpecKind, AssetType, SpecifierType, PointerType, ArrayType, FunctionType } from './asset-type';
 import {
-  DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
-  DataEntry, CodeEntry,  StructEntry, UnionEntry, EnumEntry, TypedefEntry
+  NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict
 } from './info-entry';
+import { DataLoader } from './data-loader';
 import { FilterItem, FilterParser } from './filter-parser';
 import { FilterEngine } from './filter-engine';
 import "./map-table";
 import "./map-shortcuts";
-
-const VERSION = 7;
 
 const GIT_COMMIT_MF = 'b9245f582ae2ed434332486149e0ed2a37817657';
 const GIT_COMMIT_ZM = '43b7fd52f552e4d38c1521ff9d4df5ee57e61493';
@@ -32,14 +29,6 @@ const URL_OPTIONS = 'options';
 
 const OPT_STRUCTS_UNIONS = 's';
 const OPT_ENUMS = 'e';
-
-const BUILT_IN_SIZES: { [key: string]: number } = {
-  ["char"]: 1,
-  ["short"]: 2,
-  ["int"]: 4,
-  ["float"]: 4,
-  ["double"]: 8
-};
 
 /** Renders the application */
 @customElement('map-app')
@@ -125,7 +114,7 @@ export class MapApp extends LitElement {
       row-gap: 15px;
       column-gap: 15px;
     }
-    
+
     #selectors {
       grid-column: 1 / 3;
       grid-row: 1;
@@ -181,14 +170,14 @@ export class MapApp extends LitElement {
   private showShortcuts = false;
 
   // Data fields
+  /** Handles loading data from the JSON files */
+  private loader = new DataLoader();
   /** All struct definitions in the game */
   private structs: StructEntryDict = {};
   /** All union definitions in the game */
   private unions: UnionEntryDict = {};
   /** All enum definitions in the game */
   private enums: EnumEntryDict = {};
-  /** All typedefs in the game */
-  private typedefs: TypedefEntryDict = {};
   /** Sizes of structs, unions, and typedefs */
   private sizes: { [key: string]: number } = {};
   /** All map data for game and region */
@@ -209,7 +198,7 @@ export class MapApp extends LitElement {
   constructor() {
     super();
     this.parseUrlParams();
-    this.fetchData(true, true, false);
+    this.fetchData(true, false);
     document.body.addEventListener('keydown', (e: Event) => this.handleKeyDown(e));
   }
 
@@ -225,7 +214,7 @@ export class MapApp extends LitElement {
       if (mapChanged) {
         this.tableType = getMainTableType(this.map);
       }
-      this.fetchData(false, gameChanged, regionChanged);
+      this.fetchData(false, regionChanged);
     }
   }
 
@@ -277,151 +266,28 @@ export class MapApp extends LitElement {
     window.history.replaceState(null, '', url);
   }
 
-  private getRegionEntry(entry: { [key: string]: unknown }) {
-    if (typeof entry.addr == 'object') {
-      const addrs = entry.addr as { [key: string]: string };
-      if (this.region in addrs) {
-        entry.addr = addrs[this.region]
-      } else {
-        entry.addr = null;
-        return;
-      }
-    }
-    // Data may have different counts
-    if (typeof entry.count == 'object') {
-      const counts = entry.count as { [key: string]: string };
-      if (this.region in counts) {
-        entry.count = counts[this.region]
-      }
-    }
-    // Functions may have different sizes
-    if (typeof entry.size == 'object') {
-      const sizes = entry.size as { [key: string]: string };
-      if (this.region in sizes) {
-        entry.size = sizes[this.region]
-      }
-    }
-  }
-
-  private getJsonUrl(jsonName: string): string {
-    const baseUrl = `/json/${this.game}/`;
-    const fileName = jsonName + '.json';
-    const ver = '?v=' + VERSION;
-    return baseUrl + fileName + ver;
-  }
-
-  async fetchData(first: boolean, gameChanged: boolean, keepFilter: boolean) {
+  async fetchData(first: boolean, keepFilter: boolean) {
     if (!this.game || !this.region || !this.map) {
       return;
     }
-    
+
     if (!first && !keepFilter) {
       this.clearFilter();
     }
 
-    // Read data from json files
     this.fetchingData = true;
-    const promises = [];
 
-    if (first || gameChanged) {
-      promises.push(
-        fetch(this.getJsonUrl('structs')),
-        fetch(this.getJsonUrl('unions')),
-        fetch(this.getJsonUrl('enums')),
-        fetch(this.getJsonUrl('typedefs'))
-      );
-    }
+    const { gameData, entries } = await this.loader.load(
+      this.game, this.region, this.map, this.tableType);
 
-    if (this.tableHasAddr()) {
-      promises.push(fetch(this.getJsonUrl(this.map)));
-    }
-
-    const responses = await Promise.all(promises);
-    const jsons = await Promise.all(responses.map(r => r.json()));
-
-    if (first || gameChanged) {
-      const [structJson, unionJson, enumJson, typedefJson] = jsons;
-
-      // Get structs
-      this.structs = {};
-      for (const entry of structJson) {
-        this.structs[entry[KEY_NAME]] = new StructEntry(entry);
-      }
-      // Get unions
-      this.unions = {};
-      for (const entry of unionJson) {
-        this.unions[entry[KEY_NAME]] = new UnionEntry(entry);
-      }
-      // Get enums
-      this.enums = {};
-      for (const entry of enumJson) {
-        let name = entry[KEY_NAME] as string;
-        // Strip trailing underscore
-        name = name.endsWith('_') ? name.slice(0, -1) : name
-        entry[KEY_NAME] = name;
-        this.enums[name] = new EnumEntry(entry);
-      }
-      // Get typedefs
-      this.typedefs = {};
-      for (const entry of typedefJson) {
-        this.typedefs[entry[KEY_NAME]] = new TypedefEntry(entry);
-      }
-
-      // Compute sizes
-      this.sizes = {};
-      for (const entry of Object.values(this.structs)) {
-        this.sizes[entry.name] = entry.size;
-      }
-      for (const entry of Object.values(this.unions)) {
-        this.sizes[entry.name] = entry.size;
-      }
-      for (const entry of Object.values(this.typedefs)) {
-        if (!(entry.name in this.sizes)) {
-          this.sizes[entry.name] = this.typeSize(entry.type);
-        }
-      }
-    }
-
-    // Get map data
-    if (this.tableHasAddr()) {
-      // Ram, code, or data
-      let fullData: DictEntry[] = jsons.pop();
-      // Filter by region
-      fullData.forEach(entry => this.getRegionEntry(entry));
-      fullData = fullData.filter(entry => entry.addr !== null);
-      // Convert to classes
-      if (this.tableIs(TableType.CodeList)) {
-        this.allData = fullData.map(entry => new CodeEntry(entry));
-      } else {
-        this.allData = fullData.map(entry => new DataEntry(entry));
-      }
-    } else {
-      // Structs, unions, enums, or typedefs
-      let entries;
-      switch (this.tableType) {
-        case TableType.StructList:
-          entries = this.structs;
-          break;
-        case TableType.UnionList:
-          entries = this.unions;
-          break;
-        case TableType.EnumList:
-          entries = this.enums;
-          break;
-        case TableType.TypedefList:
-          entries = this.typedefs;
-          break;
-        default:
-          throw new Error(`Invalid table type ${this.tableType}`);
-      }
-      this.allData = Object.values(entries).sort((a, b) => {
-        if (a.name < b.name) { return -1; }
-        if (a.name > b.name) { return 1; }
-        return 0;
-      });
-    }
+    this.structs = gameData.structs;
+    this.unions = gameData.unions;
+    this.enums = gameData.enums;
+    this.sizes = gameData.sizes;
+    this.allData = entries;
 
     this.filterData = this.allData;
+
     // Check if loading page with filter
     if ((first || keepFilter) && this.filter) {
       this.applyFilter();
@@ -433,55 +299,6 @@ export class MapApp extends LitElement {
     }
 
     this.fetchingData = false;
-  }
-
-  /** Computes the size of types for the purpose of storing typedef sizes */
-  private typeSize(type: AssetType): number {
-    if (type instanceof SpecifierType) {
-      const name = type.specName();
-      switch (type.kind) {
-        case TypeSpecKind.BuiltIn:
-          if (type.names.includes("long")) {
-            return 8;
-          }
-          const size = BUILT_IN_SIZES[name];
-          if (size !== undefined) {
-            return size;
-          }
-          return 4; // int by default
-        case TypeSpecKind.Typedef:
-          const td = this.typedefs[name];
-          if (td !== undefined) {
-            let size = this.sizes[td.name];
-            if (size === undefined) {
-              size = this.typeSize(td.type);
-              this.sizes[td.name] = size;
-            }
-            return size;
-          } else {
-            throw new Error(`Unrecognized typedef name ${name}`);
-          }
-        case TypeSpecKind.Struct:
-          return this.sizes[name];
-        case TypeSpecKind.Union:
-          return this.sizes[name];
-        case TypeSpecKind.Enum:
-          throw new Error(`Can't compute size of enum`);
-        default:
-          throw new Error(TypeSpecKind[type.kind]);
-      }
-    } else if (type instanceof ArrayType) {
-      if (type.size === undefined) {
-        return 0; // Treat 0 as unknown
-      }
-      return type.size * this.typeSize(type.innerType);
-    } else if (type instanceof PointerType) {
-      return 4;
-    } else if (type instanceof FunctionType) {
-      throw new Error('Function types must be pointer');
-    } else {
-      throw new Error(`Invalid type ${typeof(type)}`);
-    }
   }
 
   private handleKeyDown(e: Event) {
@@ -634,17 +451,6 @@ export class MapApp extends LitElement {
   private setMapType(map: string) {
     this.map = map;
     this.tableType = getMainTableType(map);
-  }
-
-  private tableIs(...tableTypes: TableType[]): boolean {
-    return tableTypes.includes(this.tableType);
-  }
-
-  private tableHasAddr(): boolean {
-    return this.tableIs(
-      TableType.RamList,
-      TableType.CodeList,
-      TableType.DataList);
   }
 
   private toggleColumn(event: any) {

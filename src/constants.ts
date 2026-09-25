@@ -167,6 +167,12 @@ export const CATEGORIES: { [key: string]: string } = {
 //   'lz': 'LZ'
 // };
 
+export function tableHasAddr(tableType: TableType): boolean {
+  return tableType === TableType.RamList ||
+    tableType === TableType.CodeList ||
+    tableType === TableType.DataList;
+}
+
 export function getMainTableType(map: string): TableType {
   switch(map) {
     case MAP_RAM: return TableType.RamList;
