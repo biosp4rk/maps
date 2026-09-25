@@ -9,7 +9,8 @@ import {
   DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
   DataEntry, CodeEntry,  StructEntry, UnionEntry, EnumEntry, TypedefEntry
 } from './info-entry';
-import { FilterItem, FilterParser, FilterType } from './filter-parser';
+import { FilterItem, FilterParser } from './filter-parser';
+import { FilterEngine } from './filter-engine';
 import "./map-table";
 import "./map-shortcuts";
 
@@ -554,196 +555,19 @@ export class MapApp extends LitElement {
     box.value = text;
   }
 
-  private checkNameFilter(
-    name: string,
-    item: FilterItem,
-    structUnionName: string = '',
-    enumName: string = '',
-    seenParents: Set<string> = new Set<string>()
-  ): boolean {
-    if (seenParents.has(structUnionName)) {
-      return false;
-    }
-    name = name.toLowerCase();
-    if (item.type === FilterType.Term) {
-      if (name.includes(item.term) !== item.exclude) {
-        return true;
-      }
-    } else if (item.type === FilterType.Regex) {
-      if (item.regex!.test(name) !== item.exclude) {
-        return true;
-      }
-    }
-    // Check if entry is struct or union
-    if (this.searchStructsUnions && structUnionName) {
-      let suEntry = undefined;
-      if (structUnionName in this.structs) {
-        suEntry = this.structs[structUnionName];
-      } else if (structUnionName in this.unions) {
-        suEntry = this.unions[structUnionName];
-      }
-      if (suEntry) {
-        seenParents.add(structUnionName);
-        if (suEntry.vars.some(
-          su => this.checkNameFilter(su.name, item, su.specName(), su.enum, seenParents))
-        ) {
-          return true;
-        }
-      }
-    }
-    // Check if entry has enum
-    if (this.searchEnums && enumName && enumName in this.enums) {
-      const ee = this.enums[enumName].vals;
-      if (ee.some(ev => this.checkNameFilter(ev.name, item))) {
-        return true;
-      }
-    }
-    // Did not match name, struct var, or enum val
-    return false;
-  }
-
-  private checkAddrFilter(addr: number, item: FilterItem): boolean {
-    switch (item.type) {
-      case FilterType.AddrEQ:
-        if ((addr === item.addr!) !== item.exclude) {
-          return true;
-        }
-        break;
-      case FilterType.AddrGT:
-        if ((addr > item.addr!) !== item.exclude) {
-          return true;
-        }
-        break;
-      case FilterType.AddrLT:
-        if ((addr < item.addr!) !== item.exclude) {
-          return true;
-        }
-        break;
-      case FilterType.AddrGE:
-        if ((addr >= item.addr!) !== item.exclude) {
-          return true;
-        }
-        break;
-      case FilterType.AddrLE:
-        if ((addr <= item.addr!) !== item.exclude) {
-          return true;
-        }
-        break;
-    }
-    return false;
-  }
-
-  private handleNearAddrFilter(item: FilterItem) {
-    const target = item.addr!
-    // Find index of first entry past address using binary search
-    const numEntries = this.filterData.length;
-    let low = 0;
-    let high = numEntries;
-    while (low < high) {
-      const mid = (low + high) >>> 1;
-      if (this.filterData[mid].sortValue() > target) {
-        high = mid;
-      } else {
-        low = mid + 1;
-      }
-    }
-    const idx = low;
-    // Check if exact match
-    let exact = false;
-    if (idx - 1 >= 0) {
-      let addr;
-      let size;
-      const entry = this.filterData[idx - 1];
-      if (this.tableIs(TableType.CodeList)) {
-        const ce = entry as CodeEntry;
-        addr = ce.addr
-        size = ce.size;
-      } else {
-        const de = entry as DataEntry;
-        addr = de.addr;
-        size = de.getLength(this.sizes);
-      }
-      if (target >= addr && target < addr + size) {
-        exact = true;
-      }
-    }
-    // Get left/right entries
-    let left = idx - 1;
-    if (exact) { left--; }
-    if (left < 0) { left = 0; }
-    let right = idx;
-    if (right >= numEntries) {
-      right = numEntries - 1;
-    }
-    this.filterData = this.filterData.slice(left, right + 1);
-  }
-
-  private getHighlightRegex(): RegExp | null {
-    const highlightItems = this.filterItems.filter(
-      item =>
-        (item.type === FilterType.Term || item.type === FilterType.Regex) &&
-        !item.exclude);
-    if (highlightItems.length === 0) {
-      return null;
-    }
-    return new RegExp(highlightItems.map(i => i.term).join('|'), 'gi');
-  }
-
   private applyFilter() {
-    // Parse to get filter items
     this.filterItems = FilterParser.parse(this.filter);
     this.pageIndex = 0;
-
-    // Check each filter item
-    this.filterData = this.allData;
-    for (const item of this.filterItems) {
-      switch (item.type) {
-        case FilterType.Term:
-        case FilterType.Regex:
-          this.filterData = this.filterData.filter(entry => {
-            let suName = undefined;
-            let eName = undefined;
-            if (this.tableIs(TableType.RamList, TableType.DataList)) {
-              const de = entry as DataEntry;
-              if (this.searchStructsUnions &&
-                (de.specKind === TypeSpecKind.Struct || de.specKind === TypeSpecKind.Union)) {
-                suName = de.specName();
-              }
-              if (this.searchEnums) {
-                eName = de.enum;
-              }
-            } else if (this.tableIs(TableType.StructList) && this.searchStructsUnions) {
-              const se = entry as StructEntry;
-              suName = se.name;
-            } else if (this.tableIs(TableType.EnumList) && this.searchEnums) {
-              const ee = entry as EnumEntry;
-              eName = ee.name;
-            }
-            return this.checkNameFilter(entry.name, item, suName, eName);
-          });
-          break;
-        case FilterType.AddrEQ:
-        case FilterType.AddrGT:
-        case FilterType.AddrLT:
-        case FilterType.AddrGE:
-        case FilterType.AddrLE:
-          if (this.tableHasAddr()) {
-            this.filterData = this.filterData.filter(entry => {
-              return this.checkAddrFilter(entry.sortValue(), item);
-            });
-          } else {
-            this.filterData = [];
-          }
-          break;
-        case FilterType.AddrNear:
-          if (this.tableHasAddr()) {
-            this.handleNearAddrFilter(item);
-          } else {
-            this.filterData = [];
-          }
-          break;
-      }
-    }
+    const engine = new FilterEngine({
+      tableType: this.tableType,
+      structs: this.structs,
+      unions: this.unions,
+      enums: this.enums,
+      sizes: this.sizes,
+      searchStructsUnions: this.searchStructsUnions,
+      searchEnums: this.searchEnums,
+    });
+    this.filterData = engine.apply(this.allData, this.filterItems);
   }
 
   private userApplyFilter() {
@@ -875,7 +699,7 @@ export class MapApp extends LitElement {
     }
     const firstRow = this.pageIndex * this.pageSize;
     const lastRow = firstRow + this.pageSize;
-    const highlightRegex = this.getHighlightRegex();
+    const highlightRegex = FilterEngine.highlightRegex(this.filterItems);
     return html`<map-table
       .tableType="${this.tableType}"
       .githubUrl="${GITHUB_URLS[this.game]}"

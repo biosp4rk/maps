@@ -5,50 +5,16 @@ custom-elements.json
 
 /json/
 
-/app.js
-/app.js.map
+# Typescript build output
+/*.js
+/*.js.map
+/*.d.ts
+/*.d.ts.map
 
-/map-app.js
-/map-app.js.map
-/map-app.d.ts
-/map-app.d.ts.map
-
-/map-table.js
-/map-table.js.map
-/map-table.d.ts
-/map-table.d.ts.map
-
-/map-shortcuts.js
-/map-shortcuts.js.map
-/map-shortcuts.d.ts
-/map-shortcuts.d.ts.map
-
-/constants.js
-/constants.js.map
-/constants.d.ts
-/constants.d.ts.map
-
-/asset-type.js
-/asset-type.js.map
-/asset-type.d.ts
-/asset-type.d.ts.map
-
-/info-entry.js
-/info-entry.js.map
-/info-entry.d.ts
-/info-entry.d.ts.map
-
-/filter-parser.js
-/filter-parser.js.map
-/filter-parser.d.ts
-/filter-parser.d.ts.map
-
-/utils.js
-/utils.js.map
-/utils.d.ts
-/utils.d.ts.map
-
-!custom_typings/
+# Keep the tracked root config files
+!/rollup.config.js
+!/web-dev-server.config.js
+!/web-test-runner.config.js
 
 /docs/
 *.pyc
