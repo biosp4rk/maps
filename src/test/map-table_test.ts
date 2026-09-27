@@ -4,7 +4,10 @@ import { TableType, KEY_DESC } from '../constants.js';
 
 import { fixture, html, assert } from '@open-wc/testing';
 
-async function ramTable(hidden: Set<string> = new Set<string>()): Promise<MapTable> {
+function ramTable(
+  hidden: Set<string> = new Set<string>(),
+  refs: Record<string, any> = {},
+): Promise<MapTable> {
   const entries = [
     new DataEntry({ name: 'health', type: 'int', addr: '0x100', loc: 'file.c:5' }),
   ];
@@ -14,6 +17,7 @@ async function ramTable(hidden: Set<string> = new Set<string>()): Promise<MapTab
       .tableType=${TableType.RamList}
       .githubUrl=${'https://example.com/tree/abc/'}
       .hiddenColumns=${hidden}
+      .refs=${refs}
       .entries=${entries}>
     </map-table>`);
 }
@@ -37,5 +41,27 @@ suite('map-table', () => {
 
     const hidden = await ramTable(new Set([KEY_DESC]));
     assert.isNull(hidden.shadowRoot!.querySelector('.desc'));
+  });
+
+  test('shows a reference icon only for entries that have references', async () => {
+    const without = await ramTable();
+    assert.isNull(without.shadowRoot!.querySelector('.ref-icon'));
+
+    const withRefs = await ramTable(
+      new Set(), { health: { pool: [{ name: 'FuncA', offset: 8 }] } });
+    assert.exists(withRefs.shadowRoot!.querySelector('.ref-icon'));
+  });
+
+  test('opens the references dialog when the icon is clicked', async () => {
+    const el = await ramTable(
+      new Set(), { health: { pool: [{ name: 'FuncA', offset: 8 }] } });
+    const icon = el.shadowRoot!.querySelector('.ref-icon') as HTMLElement;
+    const dialog = el.shadowRoot!.querySelector('map-refs') as any;
+    assert.isFalse(dialog.open);
+
+    icon.click();
+    await el.updateComplete;
+    assert.isTrue(dialog.open);
+    assert.equal(dialog.entryName, 'health');
   });
 });

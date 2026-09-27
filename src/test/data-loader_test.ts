@@ -12,8 +12,11 @@ const RAM = [
   { name: 'second', type: 'int', addr: { U: '0x200' }, loc: '' },
   { name: 'missing', type: 'int', addr: { E: '0x300' }, loc: '' },
 ];
+const RAM_REFS = { first: { pool: [{ name: 'FuncA', offset: 8 }] } };
 
-function fixtureFor(url: string): unknown[] {
+function fixtureFor(url: string): unknown {
+  if (url.includes('/ram_refs.')) { return RAM_REFS; }
+  if (url.includes('_refs.')) { return {}; } // code_refs, data_refs
   if (url.includes('/structs.')) { return STRUCTS; }
   if (url.includes('/enums.')) { return ENUMS; }
   if (url.includes('/ram.')) { return RAM; }
@@ -54,15 +57,23 @@ suite('data-loader', () => {
 
   test('strips a trailing underscore from enum names', async () => {
     const loader = new DataLoader();
-    const { gameData } = await loader.load('zm', 'U', 'ram', TableType.RamList);
-    assert.property(gameData.enums, 'MyEnum');
-    assert.notProperty(gameData.enums, 'MyEnum_');
+    const { gameDefs } = await loader.load('zm', 'U', 'ram', TableType.RamList);
+    assert.property(gameDefs.enums, 'MyEnum');
+    assert.notProperty(gameDefs.enums, 'MyEnum_');
   });
 
   test('builds sorted definition entries without fetching a map file', async () => {
     const loader = new DataLoader();
-    const { entries } = await loader.load('zm', 'U', 'structs', TableType.StructList);
+    const { entries, refs } = await loader.load('zm', 'U', 'structs', TableType.StructList);
     assert.deepEqual(entries.map(e => e.name), ['Foo']);
+    // Definition lists have no references
+    assert.deepEqual(refs, {});
+  });
+
+  test('loads references for an address map', async () => {
+    const loader = new DataLoader();
+    const { refs } = await loader.load('zm', 'U', 'ram', TableType.RamList);
+    assert.deepEqual(refs['first'].pool, [{ name: 'FuncA', offset: 8 }]);
   });
 
   test('caches game definitions across region and map changes', async () => {

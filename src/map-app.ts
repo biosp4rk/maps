@@ -5,7 +5,7 @@ import {
   KEY_CAT, KEY_DESC, getMainTableType, getHideableColumns
 } from './constants';
 import {
-  NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict
+  NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, RefDict
 } from './info-entry';
 import { DataLoader } from './data-loader';
 import { FilterItem, FilterParser } from './filter-parser';
@@ -182,6 +182,8 @@ export class MapApp extends LitElement {
   private sizes: { [key: string]: number } = {};
   /** All map data for game and region */
   private allData: NamedEntry[] = [];
+  /** References to the current map's entries */
+  private refs: RefDict = {};
 
   // UI fields
   private tableType: TableType = getMainTableType(this.map);
@@ -277,14 +279,15 @@ export class MapApp extends LitElement {
 
     this.fetchingData = true;
 
-    const { gameData, entries } = await this.loader.load(
+    const { gameDefs, entries, refs } = await this.loader.load(
       this.game, this.region, this.map, this.tableType);
 
-    this.structs = gameData.structs;
-    this.unions = gameData.unions;
-    this.enums = gameData.enums;
-    this.sizes = gameData.sizes;
+    this.structs = gameDefs.structs;
+    this.unions = gameDefs.unions;
+    this.enums = gameDefs.enums;
+    this.sizes = gameDefs.sizes;
     this.allData = entries;
+    this.refs = refs;
 
     this.filterData = this.allData;
 
@@ -514,6 +517,7 @@ export class MapApp extends LitElement {
       .unions="${this.unions}"
       .enums="${this.enums}"
       .sizes="${this.sizes}"
+      .refs="${this.refs}"
       .hiddenColumns="${this.hiddenColumns}"
       .highlightRegex="${highlightRegex}">
     </map-table>`;

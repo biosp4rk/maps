@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import {
-  NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict,
+  NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, RefDict,
   InfoEntry, VarEntry, NamedVarEntry, DataEntry, StructVarEntry,
   StructEntry, UnionEntry, CodeEntry, EnumValEntry, EnumEntry, TypedefEntry
 } from './info-entry';
@@ -12,6 +12,7 @@ import {
   KEY_VARS, CATEGORIES, getHeading
 } from './constants';
 import { TypeSpecKind } from './asset-type';
+import "./map-refs";
 
 const grayBorder = css`1px solid #808080`;
 const font = css`Menlo, Monaco, "Courier New", monospace`;
@@ -117,6 +118,20 @@ export class MapTable extends LitElement {
       color: #a0a0e0;
       cursor: pointer;
       margin-left: 5px;
+      user-select: none;
+    }
+
+    .ref-icon {
+      color: #b0b0b0;
+      cursor: pointer;
+      margin-left: 5px;
+      user-select: none;
+    }
+    .ref-icon svg {
+      width: 14px;
+      height: 14px;
+      vertical-align: middle;
+      padding-bottom: 1px;
     }
 
     .main-table {
@@ -148,6 +163,8 @@ export class MapTable extends LitElement {
   @property({ type: Object }) enums: EnumEntryDict = {};
   /** Sizes of structs, unions, and typedefs */
   @property({ type: Object }) sizes: { [key: string]: number } = {};
+  /** References to entries in this table */
+  @property({ type: Object }) refs: RefDict = {};
   /** Address of parent entry if table is part of row */
   @property({ type: Number }) parentAddr = NaN;
   /** Columns that should not be displayed */
@@ -157,6 +174,8 @@ export class MapTable extends LitElement {
 
   /** Indexes of rows that are expanded */
   private expandedItems: Set<string> = new Set<string>();
+  /** Name of the entry whose references dialog is open, if any */
+  private selectedRefName: string | null = null;
 
   collapseAll() {
     const tables = Array.from(this.shadowRoot?.querySelectorAll('map-table')!);
@@ -228,6 +247,16 @@ export class MapTable extends LitElement {
     } else {
       this.expandedItems.add(key);
     }
+    this.requestUpdate();
+  }
+
+  private showRefs(event: any) {
+    this.selectedRefName = event.currentTarget.dataset.refName;
+    this.requestUpdate();
+  }
+
+  private closeRefs() {
+    this.selectedRefName = null;
     this.requestUpdate();
   }
 
@@ -334,19 +363,28 @@ export class MapTable extends LitElement {
     return '';
   }
 
-  private renderToggleAndTable(entry: InfoEntry) {
-    const parts = [];
-    if (this.hasSubTable(entry)) {
-      const namedEntry = entry as NamedEntry;
-      const key = namedEntry.name;
-      const expanded = this.expandedItems.has(key);
-      parts.push(html`<span class="expand" data-expand-key="${key}"
-        @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`);
-      if (expanded) {
-        parts.push(this.renderSubTable(namedEntry));
-      }
+  private renderToggleAndTable(entry: InfoEntry): [unknown, unknown] {
+    if (!this.hasSubTable(entry)) {
+      return ['', ''];
     }
-    return parts;
+    const key = (entry as NamedEntry).name;
+    const expanded = this.expandedItems.has(key);
+    const toggle = html`<span class="expand" data-expand-key="${key}"
+      @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`;
+    const subTable = expanded ? this.renderSubTable(entry as NamedEntry) : '';
+    return [toggle, subTable];
+  }
+
+  private renderRefIcon(entry: NamedEntry) {
+    if (!(entry.name in this.refs)) {
+      return '';
+    }
+    return html`<span class="ref-icon" title="Show references"
+      data-ref-name="${entry.name}" @click="${this.showRefs}"><svg
+        viewBox="0 -960 960 960" fill="currentColor"
+      ><path d="M318-120q-82 0-140-58t-58-140q0-40 15-76t43-64l134-133 56 56-134 134q-17 17-25.5 38.5T200-318q0 49 34.5 83.5T318-200q23 0 45-8.5t39-25.5l133-134 57 57-134 133q-28 28-64 43t-76 15Z
+        m79-220-57-57 223-223 57 57-223 223Z
+        m251-28-56-57 134-133q17-17 25-38t8-44q0-50-34-85t-84-35q-23 0-44.5 8.5T558-726L425-592l-57-56 134-134q28-28 64-43t76-15q82 0 139.5 58T839-641q0 39-14.5 75T782-502L648-368Z"/></svg></span>`;
   }
 
   private renderNameInner(name: string) {
@@ -372,7 +410,6 @@ export class MapTable extends LitElement {
 
   private renderName(entry: NamedEntry, canHaveSubTable: boolean, loc?: string) {
     const inner = this.renderNameInner(entry.name);
-    const toggleAndTable = canHaveSubTable ? this.renderToggleAndTable(entry) : '';
     let span;
     if (loc) {
       const url = this.githubUrl + loc.replace(':', '#L');
@@ -380,7 +417,9 @@ export class MapTable extends LitElement {
     } else {
       span = html`<span class="name-span">${inner}</span>`;
     }
-    return html`<td class="name">${span}${toggleAndTable}</td>`;
+    // Order: name, [+] toggle, references icon, then the expanded sub-table below
+    const [toggle, subTable] = canHaveSubTable ? this.renderToggleAndTable(entry) : ['', ''];
+    return html`<td class="name">${span}${toggle}${this.renderRefIcon(entry)}${subTable}</td>`;
   }
 
   private renderDesc(desc?: string) {
@@ -561,6 +600,17 @@ export class MapTable extends LitElement {
     }
   }
 
+  private renderRefsDialog() {
+    const name = this.selectedRefName;
+    const entryRefs = name !== null ? this.refs[name] : undefined;
+    return html`<map-refs
+      .open="${entryRefs !== undefined}"
+      .entryName="${name ?? ''}"
+      .refs="${entryRefs ?? {}}"
+      @close="${this.closeRefs}">
+    </map-refs>`;
+  }
+
   override render() {
     return html`
       <table class="${this.isMainTable() ? 'main-table' : 'sub-table'}">
@@ -572,6 +622,7 @@ export class MapTable extends LitElement {
           return this.renderRow(item);
         })}
       </table>
+      ${this.renderRefsDialog()}
     `;
   }
 }

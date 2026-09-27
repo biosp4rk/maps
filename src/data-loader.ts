@@ -5,13 +5,13 @@ import {
 } from './asset-type';
 import {
   DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
-  DataEntry, CodeEntry, StructEntry, UnionEntry, EnumEntry, TypedefEntry
+  RefDict, DataEntry, CodeEntry, StructEntry, UnionEntry, EnumEntry, TypedefEntry
 } from './info-entry';
 
 const VERSION = 7;
 
 /** The game-wide definitions, shared across maps and regions */
-export interface GameData {
+export interface GameDefs {
   structs: StructEntryDict;
   unions: UnionEntryDict;
   enums: EnumEntryDict;
@@ -21,34 +21,37 @@ export interface GameData {
 
 export class DataLoader {
   private loadedGame = '';
-  private gameData?: GameData;
+  private gameDefs?: GameDefs;
 
   /**
    * Loads the entries for the provided game/region/map. The game-wide defs are
    * fetched once per game and cached, so region/map changes don't refetch them.
    */
   async load(game: string, region: string, map: string, tableType: TableType)
-      : Promise<{ gameData: GameData; entries: NamedEntry[] }> {
-    const needDefs = game !== this.loadedGame || !this.gameData;
-    const defsProm = needDefs ? this.loadGameData(game) : Promise.resolve(this.gameData!);
+      : Promise<{ gameDefs: GameDefs; entries: NamedEntry[]; refs: RefDict }> {
+    const needDefs = game !== this.loadedGame || !this.gameDefs;
+    const defsProm = needDefs ? this.loadGameDefs(game) : Promise.resolve(this.gameDefs!);
     const mapProm = tableHasAddr(tableType)
       ? this.loadMapData(game, map, region, tableType)
       : null;
 
-    const gameData = await defsProm;
-    this.gameData = gameData;
+    const gameDefs = await defsProm;
+    this.gameDefs = gameDefs;
     this.loadedGame = game;
 
-    const entries = mapProm
-      ? await mapProm
-      : this.buildDefEntries(tableType, gameData);
-    return { gameData, entries };
+    if (mapProm) {
+      const { entries, refs } = await mapProm;
+      return { gameDefs, entries, refs };
+    }
+    return { gameDefs, entries: this.buildDefEntries(tableType, gameDefs), refs: {} };
   }
 
-  private async loadGameData(game: string): Promise<GameData> {
+  private async loadGameDefs(game: string): Promise<GameDefs> {
+    // Fetch all jsons
     const [structJson, unionJson, enumJson, typedefJson] =
       await this.fetchJsons(game, ['structs', 'unions', 'enums', 'typedefs']);
 
+    // Get all definition entries
     const structs: StructEntryDict = {};
     for (const entry of structJson) {
       structs[entry[KEY_NAME]] = new StructEntry(entry);
@@ -88,33 +91,34 @@ export class DataLoader {
 
   private async loadMapData(
     game: string, map: string, region: string, tableType: TableType
-  ): Promise<NamedEntry[]> {
-    const [json] = await this.fetchJsons(game, [map]);
+  ): Promise<{ entries: NamedEntry[]; refs: RefDict }> {
+    // Fetch the map data and its references concurrently
+    const [json, refsJson] = await this.fetchJsons(game, [map, `${map}_refs`]);
     let fullData: DictEntry[] = json;
     // Filter by region
     fullData.forEach(entry => this.applyRegion(entry, region));
     fullData = fullData.filter(entry => entry.addr !== null);
     // Convert to classes
-    if (tableType === TableType.CodeList) {
-      return fullData.map(entry => new CodeEntry(entry));
-    }
-    return fullData.map(entry => new DataEntry(entry));
+    const entries = tableType === TableType.CodeList
+      ? fullData.map(entry => new CodeEntry(entry))
+      : fullData.map(entry => new DataEntry(entry));
+    return { entries, refs: refsJson as RefDict };
   }
 
-  private buildDefEntries(tableType: TableType, data: GameData): NamedEntry[] {
+  private buildDefEntries(tableType: TableType, defs: GameDefs): NamedEntry[] {
     let entries;
     switch (tableType) {
       case TableType.StructList:
-        entries = data.structs;
+        entries = defs.structs;
         break;
       case TableType.UnionList:
-        entries = data.unions;
+        entries = defs.unions;
         break;
       case TableType.EnumList:
-        entries = data.enums;
+        entries = defs.enums;
         break;
       case TableType.TypedefList:
-        entries = data.typedefs;
+        entries = defs.typedefs;
         break;
       default:
         throw new Error(`Invalid table type ${tableType}`);

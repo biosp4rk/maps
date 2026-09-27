@@ -1,7 +1,8 @@
 export {
-  DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
+  DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict,
+  TypedefEntryDict, RefEntry, RefDict,
   InfoEntry, VarEntry, NamedVarEntry, DataEntry, CodeEntry, StructVarEntry,
-  StructEntry, UnionEntry, EnumValEntry, EnumEntry, TypedefEntry
+  StructEntry, UnionEntry, EnumValEntry, EnumEntry, TypedefEntry, RefItem
 };
 import { toHex } from './utils';
 import {
@@ -19,6 +20,11 @@ type StructEntryDict = { [key: string]: StructEntry };
 type UnionEntryDict = { [key: string]: UnionEntry };
 type EnumEntryDict = { [key: string]: EnumEntry };
 type TypedefEntryDict = { [key: string]: TypedefEntry };
+
+/** References to an entry, grouped by category (call, pool, data) */
+type RefEntry = { [category: string]: RefItem[] };
+/** All references for a map, keyed by entry name */
+type RefDict = { [name: string]: RefEntry };
 
 function swap_key_value(obj: any): any {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [v, k]));
@@ -368,4 +374,11 @@ class TypedefEntry extends InfoEntry {
     this.type = PARSER.parse(tokens);
     this.loc = entry[KEY_LOC] as string;
   }
+}
+
+/** A single place that references an entry */
+interface RefItem {
+  name: string;
+  offset: number;
+  index?: number;
 }
