@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import {
   NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, RefDict,
@@ -260,22 +260,22 @@ export class MapTable extends LitElement {
 
   private renderType(type: string) {
     if (this.hiddenColumns.has(KEY_TYPE)) {
-      return '';
+      return nothing;
     }
     return html`<td class="type">${type}</td>`
   }
 
   private renderCat(cat?: string) {
     if (this.hiddenColumns.has(KEY_CAT)) {
-      return '';
+      return nothing;
     }
     const catName = cat ? CATEGORIES[cat] : undefined;
-    return html`<td class="cat">${catName ?? ''}</td>`
+    return html`<td class="cat">${catName ?? nothing}</td>`
   }
 
   private renderVarLength(entry: VarEntry) {
     if (this.hiddenColumns.has(KEY_LEN)) {
-      return '';
+      return nothing;
     }
     let lenStr;
     let toolTip;
@@ -358,24 +358,24 @@ export class MapTable extends LitElement {
     } else if (entry instanceof EnumEntry) {
       return this.renderDef(TableType.EnumDef, (entry as EnumEntry).vals);
     }
-    return '';
+    return nothing;
   }
 
   private renderToggleAndTable(entry: InfoEntry): [unknown, unknown] {
     if (!this.hasSubTable(entry)) {
-      return ['', ''];
+      return [nothing, nothing];
     }
     const key = (entry as NamedEntry).name;
     const expanded = this.expandedItems.has(key);
     const toggle = html`<span class="expand" data-expand-key="${key}"
       @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`;
-    const subTable = expanded ? this.renderSubTable(entry as NamedEntry) : '';
+    const subTable = expanded ? this.renderSubTable(entry as NamedEntry) : nothing;
     return [toggle, subTable];
   }
 
   private renderRefIcon(entry: NamedEntry) {
     if (!(entry.name in this.refs)) {
-      return '';
+      return nothing;
     }
     return html`<span class="ref-icon" title="Show references"
       data-ref-name="${entry.name}" @click="${this.showRefs}"><svg
@@ -416,13 +416,13 @@ export class MapTable extends LitElement {
       span = html`<span class="name-span">${inner}</span>`;
     }
     // Order: name, [+] toggle, references icon, then the expanded sub-table below
-    const [toggle, subTable] = canHaveSubTable ? this.renderToggleAndTable(entry) : ['', ''];
+    const [toggle, subTable] = canHaveSubTable ? this.renderToggleAndTable(entry) : [nothing, nothing];
     return html`<td class="name">${span}${toggle}${this.renderRefIcon(entry)}${subTable}</td>`;
   }
 
   private renderDesc(desc?: string) {
     if (this.hiddenColumns.has(KEY_DESC)) {
-      return '';
+      return nothing;
     }
     return html`<td class="desc">${desc}</td>`
   }
@@ -440,7 +440,7 @@ export class MapTable extends LitElement {
 
   private renderCodeLength(entry: CodeEntry) {
     if (this.hiddenColumns.has(KEY_LEN)) {
-      return '';
+      return nothing;
     }
     const toolTip = entry.getToolTip();
     return html`<td class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
@@ -470,7 +470,7 @@ export class MapTable extends LitElement {
 
   private renderCodeParams(entry: CodeEntry) {
     if (this.hiddenColumns.has(KEY_PARAMS)) {
-      return '';
+      return nothing;
     }
     const params = entry.params;
     if (!params) {
@@ -483,7 +483,7 @@ export class MapTable extends LitElement {
 
   private renderCodeRet(entry: CodeEntry) {
     if (this.hiddenColumns.has(KEY_RET)) {
-      return '';
+      return nothing;
     }
     const ret = entry.return;
     if (!ret) {
@@ -505,14 +505,14 @@ export class MapTable extends LitElement {
 
   private renderStructOrUnionSize(size: number) {
     if (this.hiddenColumns.has(KEY_SIZE)) {
-      return '';
+      return nothing;
     }
     return html`<td class="size">${toHex(size)}</td>`;
   }
 
   private renderListEntry(entry: StructEntry | UnionEntry | EnumEntry) {
     const size = entry instanceof EnumEntry ?
-      '' : this.renderStructOrUnionSize(entry.size);
+      nothing : this.renderStructOrUnionSize(entry.size);
     const cellClass = entry instanceof EnumEntry ? 'vals' : 'vars';
     return html`<tr>
       ${size}

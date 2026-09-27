@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import { RefEntry, RefItem } from './info-entry';
 import { toHex } from './utils';
@@ -53,7 +53,7 @@ export class MapRefs extends LitElement {
 
   private renderItem(item: RefItem) {
     const index = item.index !== undefined
-      ? html`<span class="ref-index">[${item.index}]</span>` : '';
+      ? html`<span class="ref-index">[${item.index}]</span>` : nothing;
     return html`<li>${item.name}${index}
       <span class="ref-offset">+0x${toHex(item.offset)}</span></li>`;
   }
@@ -61,7 +61,7 @@ export class MapRefs extends LitElement {
   private renderCategory(category: string, label: string) {
     const items = this.refs[category];
     if (!items || items.length === 0) {
-      return '';
+      return nothing;
     }
     return html`
       <h3>${label} (${items.length})</h3>

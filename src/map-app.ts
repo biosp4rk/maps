@@ -1,4 +1,4 @@
-import { LitElement, html, css, PropertyValues } from 'lit';
+import { LitElement, html, css, nothing, PropertyValues } from 'lit';
 import { state, customElement } from 'lit/decorators.js';
 import {
   GAMES, MAPS, TableType, REGIONS, GAME_SHORTCUTS, MAP_SHORTCUTS, REGION_SHORTCUTS,
@@ -505,7 +505,7 @@ export class MapApp extends LitElement {
 
   private renderTable() {
     if (this.fetchingData) {
-      return '';
+      return nothing;
     }
     const firstRow = this.pageIndex * this.pageSize;
     const lastRow = firstRow + this.pageSize;
