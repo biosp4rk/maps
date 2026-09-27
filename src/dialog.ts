@@ -1,0 +1,67 @@
+import { html, css, nothing } from 'lit';
+
+export const dialogStyles = css`
+  .dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  .dialog {
+    background: #202020;
+    color: #f0f0f0;
+    border: 1px solid #808080;
+    border-radius: 8px;
+    padding: 15px 25px;
+    min-width: 300px;
+    max-width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    text-align: left;
+    font-family: verdana, sans-serif;
+  }
+  .dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+  }
+  .dialog-header h2 {
+    margin: 0;
+    font-size: 120%;
+  }
+  .dialog-close {
+    background: none;
+    border: none;
+    color: #b0b0b0;
+    font-size: 18px;
+    line-height: 1;
+    padding: 6px 8px;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+  .dialog-close:hover {
+    background: #383838;
+  }
+`;
+
+export function renderDialog(
+  open: boolean, title: unknown, body: unknown, onClose: () => void
+) {
+  if (!open) {
+    return nothing;
+  }
+  return html`
+    <div class="dialog-overlay" @click="${onClose}">
+      <div class="dialog" @click="${(e: Event) => e.stopPropagation()}">
+        <div class="dialog-header">
+          <h2>${title}</h2>
+          <button class="dialog-close" title="Close" @click="${onClose}">✕</button>
+        </div>
+        ${body}
+      </div>
+    </div>`;
+}

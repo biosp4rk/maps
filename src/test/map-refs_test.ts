@@ -14,7 +14,7 @@ suite('map-refs', () => {
 
   test('renders nothing when closed', async () => {
     const el = await refsDialog(false, { pool: [{ name: 'FuncA', offset: 8 }] });
-    assert.isNull(el.shadowRoot!.querySelector('.refs-dialog'));
+    assert.isNull(el.shadowRoot!.querySelector('.dialog'));
   });
 
   test('lists references grouped by category with counts and offsets', async () => {
@@ -37,7 +37,7 @@ suite('map-refs', () => {
     const el = await refsDialog(true, { pool: [{ name: 'FuncA', offset: 8 }] });
     let closed = false;
     el.addEventListener('close', () => { closed = true; });
-    (el.shadowRoot!.querySelector('.refs-close') as HTMLElement).click();
+    (el.shadowRoot!.querySelector('.dialog-close') as HTMLElement).click();
     assert.isTrue(closed);
   });
 
