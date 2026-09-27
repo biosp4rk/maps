@@ -83,6 +83,17 @@ const STR_TO_MODE = swap_key_value(MODE_TO_STR);
 const TOKENIZER = new TypeTokenizer();
 const PARSER = new TypeParser();
 
+const parsedTypeCache: Map<string, AssetType> = new Map();
+
+function parseDecl(decl: string): AssetType {
+  let type = parsedTypeCache.get(decl);
+  if (type === undefined) {
+    type = PARSER.parse(TOKENIZER.tokenize(decl));
+    parsedTypeCache.set(decl, type);
+  }
+  return type;
+}
+
 abstract class InfoEntry {
   desc?: string;
 
@@ -192,8 +203,7 @@ class VarEntry extends InfoEntry {
   }
 
   private parseType() {
-    const tokens = TOKENIZER.tokenize(this.decl);
-    let type = PARSER.parse(tokens);
+    let type = parseDecl(this.decl);
     this.isPtr = false;
     this.innerCount = 1;
 
@@ -370,8 +380,7 @@ class TypedefEntry extends InfoEntry {
     super(entry);
     this.name = entry[KEY_NAME] as string;
     this.decl = entry[KEY_TYPE] as string;
-    const tokens = TOKENIZER.tokenize(this.decl);
-    this.type = PARSER.parse(tokens);
+    this.type = parseDecl(this.decl);
     this.loc = entry[KEY_LOC] as string;
   }
 }
