@@ -12,10 +12,8 @@ import {
   KEY_VARS, CATEGORIES, getHeading
 } from './constants';
 import { TypeSpecKind } from './asset-type';
-import "./map-refs";
-
-const grayBorder = css`1px solid #808080`;
-const font = css`Menlo, Monaco, "Courier New", monospace`;
+import './map-refs';
+import { monoFont, colorMuted, colorAccent, grayBorder } from './theme';
 
 /** Renders a table */
 @customElement('map-table')
@@ -64,7 +62,7 @@ export class MapTable extends LitElement {
     .size,
     .type,
     .val {
-      font-family: ${font};
+      font-family: ${monoFont};
       text-align: right;
     }
     
@@ -76,8 +74,8 @@ export class MapTable extends LitElement {
       max-width: 350px;
       display: inline-block;
       word-wrap: break-word;
-      color: #9cdcfe;
-      font-family: ${font};
+      color: ${colorAccent};
+      font-family: ${monoFont};
     }
 
     .desc {
@@ -94,7 +92,7 @@ export class MapTable extends LitElement {
     }
 
     .code-var {
-      font-family: ${font};
+      font-family: ${monoFont};
     }
 
     .code-var-desc {
@@ -122,7 +120,7 @@ export class MapTable extends LitElement {
     }
 
     .ref-icon {
-      color: #b0b0b0;
+      color: ${colorMuted};
       cursor: pointer;
       margin-left: 5px;
       user-select: none;

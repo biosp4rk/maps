@@ -10,8 +10,9 @@ import {
 import { DataLoader } from './data-loader';
 import { FilterItem, FilterParser } from './filter-parser';
 import { FilterEngine } from './filter-engine';
-import "./map-table";
-import "./map-shortcuts";
+import './map-table';
+import './map-shortcuts';
+import { bodyFont, colorText } from "./theme";
 
 const GIT_COMMIT_MF = 'b9245f582ae2ed434332486149e0ed2a37817657';
 const GIT_COMMIT_ZM = '43b7fd52f552e4d38c1521ff9d4df5ee57e61493';
@@ -36,8 +37,8 @@ export class MapApp extends LitElement {
   static override styles = css`
     :host {
       display: block;
-      color: #f0f0f0;
-      font-family: verdana, sans-serif;
+      color: ${colorText};
+      font-family: ${bodyFont};
     }
 
     h1 {
@@ -50,7 +51,7 @@ export class MapApp extends LitElement {
     input,
     select {
       background: black;
-      color: #f0f0f0;
+      color: ${colorText};
       border: 1px solid #606060;
       border-radius: 5px;
     }

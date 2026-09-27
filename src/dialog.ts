@@ -1,4 +1,5 @@
 import { html, css, nothing } from 'lit';
+import { colorText, colorMuted, grayBorder } from './theme';
 
 export const dialogStyles = css`
   .dialog-overlay {
@@ -12,8 +13,8 @@ export const dialogStyles = css`
   }
   .dialog {
     background: #202020;
-    color: #f0f0f0;
-    border: 1px solid #808080;
+    color: ${colorText};
+    border: ${grayBorder};
     border-radius: 8px;
     padding: 15px 25px;
     min-width: 300px;
@@ -36,7 +37,7 @@ export const dialogStyles = css`
   .dialog-close {
     background: none;
     border: none;
-    color: #b0b0b0;
+    color: ${colorMuted};
     font-size: 18px;
     line-height: 1;
     padding: 6px 8px;

@@ -3,6 +3,7 @@ import { property, customElement } from 'lit/decorators.js';
 import { RefEntry, RefItem } from './info-entry';
 import { toHex } from './utils';
 import { dialogStyles, renderDialog } from './dialog';
+import { colorMuted, colorAccent } from './theme';
 
 const REF_CATEGORIES: [string, string][] = [
   ['call', 'Function calls'],
@@ -18,7 +19,7 @@ export class MapRefs extends LitElement {
   static override styles = [dialogStyles, css`
     .refs-name {
       font-family: ${monoFont};
-      color: #9cdcfe;
+      color: ${colorAccent};
     }
     h3 {
       margin-bottom: 4px;
@@ -35,10 +36,10 @@ export class MapRefs extends LitElement {
 
     .ref-offset,
     .ref-index {
-      color: #b0b0b0;
+      color: ${colorMuted};
     }
     .no-refs {
-      color: #b0b0b0;
+      color: ${colorMuted};
     }
   `];
 

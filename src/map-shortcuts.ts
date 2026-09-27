@@ -4,6 +4,7 @@ import {
   GAMES, MAPS, GAME_SHORTCUTS, MAP_SHORTCUTS, REGION_SHORTCUTS
 } from './constants';
 import { dialogStyles, renderDialog } from './dialog';
+import { monoFont, grayBorder } from './theme';
 
 @customElement('map-shortcuts')
 export class MapShortcuts extends LitElement {
@@ -21,10 +22,10 @@ export class MapShortcuts extends LitElement {
     }
     kbd {
       background: #101010;
-      border: 1px solid #808080;
+      border: ${grayBorder};
       border-radius: 4px;
       padding: 1px 6px;
-      font-family: Menlo, Monaco, "Courier New", monospace;
+      font-family: ${monoFont};
     }
   `];
 
