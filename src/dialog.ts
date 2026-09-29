@@ -16,19 +16,22 @@ export const dialogStyles = css`
     color: ${colorText};
     border: ${grayBorder};
     border-radius: 8px;
-    padding: 15px 25px;
     min-width: 300px;
     max-width: 90%;
     max-height: 80vh;
-    overflow-y: auto;
     text-align: left;
     font-family: verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
   }
   .dialog-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 40px;
+    flex-shrink: 0;
+    padding: 16px 20px;
+    border-bottom: ${grayBorder};
   }
   .dialog-header h2 {
     margin: 0;
@@ -41,11 +44,22 @@ export const dialogStyles = css`
     font-size: 18px;
     line-height: 1;
     padding: 6px 8px;
-    cursor: pointer;
     border-radius: 5px;
+    cursor: pointer;
   }
   .dialog-close:hover {
     background: #383838;
+  }
+  .dialog-body {
+    overflow-y: auto;
+    min-height: 0;
+    padding: 16px 20px;
+  }
+  .dialog-body > :first-child {
+    margin-top: 0;
+  }
+  .dialog-body > :last-child  {
+    margin-bottom: 0;
   }
 `;
 
@@ -62,7 +76,7 @@ export function renderDialog(
           <h2>${title}</h2>
           <button class="dialog-close" title="Close" @click="${onClose}">✕</button>
         </div>
-        ${body}
+        <div class="dialog-body">${body}</div>
       </div>
     </div>`;
 }

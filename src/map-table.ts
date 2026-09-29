@@ -391,9 +391,8 @@ export class MapTable extends LitElement {
     }
     const parts = [];
     let idx = 0;
-    let match;
-    while ((match = this.highlightRegex.exec(name)) !== null) {
-      const matchIdx = match.index;
+    for (const match of name.matchAll(this.highlightRegex)) {
+      const matchIdx = match.index!;
       if (matchIdx > idx) {
         parts.push(name.slice(idx, matchIdx));
       }
