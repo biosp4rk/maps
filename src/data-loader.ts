@@ -157,7 +157,7 @@ export class DataLoader {
   }
 
   private getJsonUrl(game: string, jsonName: string): string {
-    return `/json/${game}/${jsonName}.json?v=${VERSION}`;
+    return `/maps/json/${game}/${jsonName}.json?v=${VERSION}`;
   }
 
   private async fetchJsons(game: string, names: string[]): Promise<any[]> {
