@@ -52,7 +52,11 @@ export class MapRefs extends LitElement {
   @property({ type: String }) entryName = '';
   @property({ type: Object }) refs: RefEntry = {};
 
-  private scrollLock = new ScrollLock(this, () => this.open);
+  constructor() {
+    super();
+    // Locks page scroll while the dialog is open
+    new ScrollLock(this, () => this.open);
+  }
 
   private close() {
     this.dispatchEvent(new CustomEvent('close'));
@@ -64,7 +68,6 @@ export class MapRefs extends LitElement {
     params.set(URL_MAP, category === 'data' ? MAP_DATA : MAP_CODE);
     params.set(URL_FILTER, `"${item.name}"`);
     const url = '?' + params.toString();
-    //
     const index = item.index !== undefined
       ? html`<span class="ref-index">[${item.index}]</span>` : nothing;
     return html`<li><a href="${url}" class="item-name">${item.name}</a>${index}

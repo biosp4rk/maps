@@ -18,7 +18,7 @@ export class ScrollLock implements ReactiveController {
   private locked = false;
 
   constructor(
-    private host: ReactiveControllerHost,
+    host: ReactiveControllerHost,
     private isOpen: () => boolean,
   ) {
     host.addController(this);

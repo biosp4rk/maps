@@ -32,7 +32,11 @@ export class MapShortcuts extends LitElement {
 
   @property({ type: Boolean }) open = false;
 
-  private scrollLock = new ScrollLock(this, () => this.open);
+  constructor() {
+    super();
+    // Locks page scroll while the dialog is open
+    new ScrollLock(this, () => this.open);
+  }
 
   private close() {
     this.dispatchEvent(new CustomEvent('close'));
