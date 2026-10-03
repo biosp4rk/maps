@@ -1,8 +1,9 @@
 import { LitElement, html, css, nothing, PropertyValues } from 'lit';
 import { state, customElement } from 'lit/decorators.js';
 import {
-  GAMES, MAPS, TableType, REGIONS, GAME_SHORTCUTS, MAP_SHORTCUTS, REGION_SHORTCUTS,
-  KEY_CAT, KEY_DESC, getMainTableType, getHideableColumns
+  GAMES, MAPS, TableType, REGIONS, URL_GAME, URL_MAP, URL_REGION, URL_FILTER,
+  URL_OPTIONS, OPT_STRUCTS_UNIONS, OPT_ENUMS, GAME_SHORTCUTS, MAP_SHORTCUTS,
+  REGION_SHORTCUTS, KEY_CAT, KEY_DESC, getMainTableType, getHideableColumns
 } from './constants';
 import {
   NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, RefDict
@@ -21,15 +22,6 @@ const GITHUB_URLS: { [key: string]: string } = {
   mf: 'https://github.com/metroidret/mf/tree/' + GIT_COMMIT_MF + '/',
   zm: 'https://github.com/metroidret/mzm/tree/' + GIT_COMMIT_ZM + '/',
 };
-
-const URL_GAME = 'game';
-const URL_MAP = 'map';
-const URL_REGION = 'region';
-const URL_FILTER = 'filter';
-const URL_OPTIONS = 'options';
-
-const OPT_STRUCTS_UNIONS = 's';
-const OPT_ENUMS = 'e';
 
 /** Renders the application */
 @customElement('map-app')
@@ -518,8 +510,8 @@ export class MapApp extends LitElement {
       .unions="${this.unions}"
       .enums="${this.enums}"
       .sizes="${this.sizes}"
-      .refs="${this.refs}"
       .hiddenColumns="${this.hiddenColumns}"
+      .refs="${this.refs}"
       .highlightRegex="${highlightRegex}">
     </map-table>`;
   }

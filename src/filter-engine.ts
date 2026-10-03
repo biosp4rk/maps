@@ -24,6 +24,7 @@ export class FilterEngine {
     for (const item of filterItems) {
       switch (item.type) {
         case FilterType.Term:
+        case FilterType.Quote:
         case FilterType.Regex:
           data = data.filter(entry => this.matchesName(entry, item));
           break;
@@ -88,6 +89,10 @@ export class FilterEngine {
     name = name.toLowerCase();
     if (item.type === FilterType.Term) {
       if (name.includes(item.term) !== item.exclude) {
+        return true;
+      }
+    } else if (item.type === FilterType.Quote) {
+      if ((item.term === name) !== item.exclude) {
         return true;
       }
     } else if (item.type === FilterType.Regex) {

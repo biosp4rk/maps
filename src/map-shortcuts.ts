@@ -5,6 +5,7 @@ import {
 } from './constants';
 import { dialogStyles, renderDialog } from './dialog';
 import { monoFont, grayBorder } from './theme';
+import { ScrollLock } from './scroll-lock';
 
 @customElement('map-shortcuts')
 export class MapShortcuts extends LitElement {
@@ -30,6 +31,8 @@ export class MapShortcuts extends LitElement {
   `];
 
   @property({ type: Boolean }) open = false;
+
+  private scrollLock = new ScrollLock(this, () => this.open);
 
   private close() {
     this.dispatchEvent(new CustomEvent('close'));

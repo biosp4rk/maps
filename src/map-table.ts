@@ -410,7 +410,7 @@ export class MapTable extends LitElement {
     let span;
     if (loc) {
       const url = this.githubUrl + loc.replace(':', '#L');
-      span = html`<a href=${url} target="_blank" class="name-span">${inner}</a>`;
+      span = html`<a href="${url}" target="_blank" class="name-span">${inner}</a>`;
     } else {
       span = html`<span class="name-span">${inner}</span>`;
     }
@@ -569,8 +569,8 @@ export class MapTable extends LitElement {
       .unions="${this.unions}"
       .enums="${this.enums}"
       .sizes="${this.sizes}"
-      .parentAddr="${parentAddr}"
-      .hiddenColumns="${this.hiddenColumns}">
+      .hiddenColumns="${this.hiddenColumns}"
+      .parentAddr="${parentAddr}">
     </map-table>`;
   }
 
