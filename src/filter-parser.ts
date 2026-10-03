@@ -2,8 +2,9 @@
 // Space -> /\s+/
 // Hex -> /[0-9A-F]+/
 // Filter -> FilterItem (Space FilterItem)*
-// FilterItem -> Term | Regex | Addr
+// FilterItem -> Term | Quote | Regex | Addr
 // Term -> /\S+/
+// Quote -> '"' /[^"]*/ '"'
 // Regex -> '/' /[^/]*/ '/'
 // Addr -> AddrEQ | AddrGT | AddrLT | AddrGE | AddrLE | AddrNear
 // AddrEQ -> '=' Hex
@@ -13,11 +14,11 @@
 // AddrLE -> '<=' Hex
 // AddrNear -> '~' Hex
 
-
 const ROM_OFFSET = 0x8000000;
 
 export enum FilterType {
   Term,
+  Quote,
   Regex,
   AddrEQ,
   AddrGT,
@@ -62,6 +63,7 @@ export class FilterParser {
     for (const item of this.items) {
       switch (item.type) {
         case FilterType.Term:
+        case FilterType.Quote:
           item.term = item.term.toLowerCase();
           break;
         case FilterType.Regex:
@@ -169,7 +171,10 @@ export class FilterParser {
 
   private static parseFilterNonAddr(c: string): void {
     // Item text is expected, so don't check for minus or space
-    if (c === '/') {
+    if (c === '"') {
+      this.items.push(new FilterItem(FilterType.Quote, this.exclude));
+      this.parseFilterQuote();
+    } else if (c === '/') {
       this.items.push(new FilterItem(FilterType.Regex, this.exclude));
       this.parseFilterRegex();
     } else {
@@ -205,6 +210,25 @@ export class FilterParser {
       return;
     }
     this.parseFilterNonAddr(c);
+  }
+
+  private static parseFilterQuote(): void {
+    this.exclude = false;
+    let terminated = false;
+    while (this.index < this.filter.length) {
+      const c = this.filter[this.index++];
+      if (c === '"') {
+        terminated = true;
+        break;
+      }
+      this.addToLast(c);
+    }
+    if (!terminated) {
+      // TODO: Indicate problem to user
+      this.items.pop();
+      return;
+    }
+    this.parseFilterSpace();
   }
   
   private static parseFilterRegex(): void {

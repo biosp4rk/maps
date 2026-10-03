@@ -1,7 +1,8 @@
 export {
-  DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, TypedefEntryDict,
+  DictEntry, NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict,
+  TypedefEntryDict, RefEntry, RefDict,
   InfoEntry, VarEntry, NamedVarEntry, DataEntry, CodeEntry, StructVarEntry,
-  StructEntry, UnionEntry, EnumValEntry, EnumEntry, TypedefEntry
+  StructEntry, UnionEntry, EnumValEntry, EnumEntry, TypedefEntry, RefItem
 };
 import { toHex } from './utils';
 import {
@@ -19,6 +20,11 @@ type StructEntryDict = { [key: string]: StructEntry };
 type UnionEntryDict = { [key: string]: UnionEntry };
 type EnumEntryDict = { [key: string]: EnumEntry };
 type TypedefEntryDict = { [key: string]: TypedefEntry };
+
+/** References to an entry, grouped by category (call, pool, data) */
+type RefEntry = { [category: string]: RefItem[] };
+/** All references for a map, keyed by entry name */
+type RefDict = { [name: string]: RefEntry };
 
 function swap_key_value(obj: any): any {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [v, k]));
@@ -76,6 +82,17 @@ const STR_TO_MODE = swap_key_value(MODE_TO_STR);
 
 const TOKENIZER = new TypeTokenizer();
 const PARSER = new TypeParser();
+
+const parsedTypeCache: Map<string, AssetType> = new Map();
+
+function parseDecl(decl: string): AssetType {
+  let type = parsedTypeCache.get(decl);
+  if (type === undefined) {
+    type = PARSER.parse(TOKENIZER.tokenize(decl));
+    parsedTypeCache.set(decl, type);
+  }
+  return type;
+}
 
 abstract class InfoEntry {
   desc?: string;
@@ -186,8 +203,7 @@ class VarEntry extends InfoEntry {
   }
 
   private parseType() {
-    const tokens = TOKENIZER.tokenize(this.decl);
-    let type = PARSER.parse(tokens);
+    let type = parseDecl(this.decl);
     this.isPtr = false;
     this.innerCount = 1;
 
@@ -364,8 +380,14 @@ class TypedefEntry extends InfoEntry {
     super(entry);
     this.name = entry[KEY_NAME] as string;
     this.decl = entry[KEY_TYPE] as string;
-    const tokens = TOKENIZER.tokenize(this.decl);
-    this.type = PARSER.parse(tokens);
+    this.type = parseDecl(this.decl);
     this.loc = entry[KEY_LOC] as string;
   }
+}
+
+/** A single place that references an entry */
+interface RefItem {
+  name: string;
+  offset: number;
+  index?: number;
 }

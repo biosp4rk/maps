@@ -1,7 +1,7 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { property, customElement } from 'lit/decorators.js';
 import {
-  NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict,
+  NamedEntry, StructEntryDict, UnionEntryDict, EnumEntryDict, RefDict,
   InfoEntry, VarEntry, NamedVarEntry, DataEntry, StructVarEntry,
   StructEntry, UnionEntry, CodeEntry, EnumValEntry, EnumEntry, TypedefEntry
 } from './info-entry';
@@ -12,9 +12,8 @@ import {
   KEY_VARS, CATEGORIES, getHeading
 } from './constants';
 import { TypeSpecKind } from './asset-type';
-
-const grayBorder = css`1px solid #808080`;
-const font = css`Menlo, Monaco, "Courier New", monospace`;
+import './map-refs';
+import { monoFont, colorMuted, colorAccent, grayBorder } from './theme';
 
 /** Renders a table */
 @customElement('map-table')
@@ -63,7 +62,7 @@ export class MapTable extends LitElement {
     .size,
     .type,
     .val {
-      font-family: ${font};
+      font-family: ${monoFont};
       text-align: right;
     }
     
@@ -75,8 +74,8 @@ export class MapTable extends LitElement {
       max-width: 350px;
       display: inline-block;
       word-wrap: break-word;
-      color: #9cdcfe;
-      font-family: ${font};
+      color: ${colorAccent};
+      font-family: ${monoFont};
     }
 
     .desc {
@@ -93,7 +92,7 @@ export class MapTable extends LitElement {
     }
 
     .code-var {
-      font-family: ${font};
+      font-family: ${monoFont};
     }
 
     .code-var-desc {
@@ -117,6 +116,20 @@ export class MapTable extends LitElement {
       color: #a0a0e0;
       cursor: pointer;
       margin-left: 5px;
+      user-select: none;
+    }
+
+    .ref-icon {
+      color: ${colorMuted};
+      cursor: pointer;
+      margin-left: 5px;
+      user-select: none;
+    }
+    .ref-icon svg {
+      width: 14px;
+      height: 14px;
+      vertical-align: middle;
+      padding-bottom: 1px;
     }
 
     .main-table {
@@ -148,6 +161,8 @@ export class MapTable extends LitElement {
   @property({ type: Object }) enums: EnumEntryDict = {};
   /** Sizes of structs, unions, and typedefs */
   @property({ type: Object }) sizes: { [key: string]: number } = {};
+  /** References to entries in this table */
+  @property({ type: Object }) refs: RefDict = {};
   /** Address of parent entry if table is part of row */
   @property({ type: Number }) parentAddr = NaN;
   /** Columns that should not be displayed */
@@ -157,6 +172,8 @@ export class MapTable extends LitElement {
 
   /** Indexes of rows that are expanded */
   private expandedItems: Set<string> = new Set<string>();
+  /** Name of the entry whose references dialog is open, if any */
+  private selectedRefName: string | null = null;
 
   collapseAll() {
     const tables = Array.from(this.shadowRoot?.querySelectorAll('map-table')!);
@@ -231,24 +248,34 @@ export class MapTable extends LitElement {
     this.requestUpdate();
   }
 
+  private showRefs(event: any) {
+    this.selectedRefName = event.currentTarget.dataset.refName;
+    this.requestUpdate();
+  }
+
+  private closeRefs() {
+    this.selectedRefName = null;
+    this.requestUpdate();
+  }
+
   private renderType(type: string) {
     if (this.hiddenColumns.has(KEY_TYPE)) {
-      return '';
+      return nothing;
     }
     return html`<td class="type">${type}</td>`
   }
 
   private renderCat(cat?: string) {
     if (this.hiddenColumns.has(KEY_CAT)) {
-      return '';
+      return nothing;
     }
     const catName = cat ? CATEGORIES[cat] : undefined;
-    return html`<td class="cat">${catName ?? ''}</td>`
+    return html`<td class="cat">${catName ?? nothing}</td>`
   }
 
   private renderVarLength(entry: VarEntry) {
     if (this.hiddenColumns.has(KEY_LEN)) {
-      return '';
+      return nothing;
     }
     let lenStr;
     let toolTip;
@@ -262,7 +289,7 @@ export class MapTable extends LitElement {
       if (error instanceof Error) {
         msg = `${msg}: ${error.message}`;
       }
-      console.log(msg);
+      console.error(msg);
       lenStr = '?';
       toolTip = '';
     }
@@ -331,22 +358,31 @@ export class MapTable extends LitElement {
     } else if (entry instanceof EnumEntry) {
       return this.renderDef(TableType.EnumDef, (entry as EnumEntry).vals);
     }
-    return '';
+    return nothing;
   }
 
-  private renderToggleAndTable(entry: InfoEntry) {
-    const parts = [];
-    if (this.hasSubTable(entry)) {
-      const namedEntry = entry as NamedEntry;
-      const key = namedEntry.name;
-      const expanded = this.expandedItems.has(key);
-      parts.push(html`<span class="expand" data-expand-key="${key}"
-        @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`);
-      if (expanded) {
-        parts.push(this.renderSubTable(namedEntry));
-      }
+  private renderToggleAndTable(entry: InfoEntry): [unknown, unknown] {
+    if (!this.hasSubTable(entry)) {
+      return [nothing, nothing];
     }
-    return parts;
+    const key = (entry as NamedEntry).name;
+    const expanded = this.expandedItems.has(key);
+    const toggle = html`<span class="expand" data-expand-key="${key}"
+      @click="${this.expand}">[${expanded ? '−' : '+'}]</span>`;
+    const subTable = expanded ? this.renderSubTable(entry as NamedEntry) : nothing;
+    return [toggle, subTable];
+  }
+
+  private renderRefIcon(entry: NamedEntry) {
+    if (!(entry.name in this.refs)) {
+      return nothing;
+    }
+    return html`<span class="ref-icon" title="Show references"
+      data-ref-name="${entry.name}" @click="${this.showRefs}"><svg
+        viewBox="0 -960 960 960" fill="currentColor"
+      ><path d="M318-120q-82 0-140-58t-58-140q0-40 15-76t43-64l134-133 56 56-134 134q-17 17-25.5 38.5T200-318q0 49 34.5 83.5T318-200q23 0 45-8.5t39-25.5l133-134 57 57-134 133q-28 28-64 43t-76 15Z
+        m79-220-57-57 223-223 57 57-223 223Z
+        m251-28-56-57 134-133q17-17 25-38t8-44q0-50-34-85t-84-35q-23 0-44.5 8.5T558-726L425-592l-57-56 134-134q28-28 64-43t76-15q82 0 139.5 58T839-641q0 39-14.5 75T782-502L648-368Z"/></svg></span>`;
   }
 
   private renderNameInner(name: string) {
@@ -355,9 +391,8 @@ export class MapTable extends LitElement {
     }
     const parts = [];
     let idx = 0;
-    let match;
-    while ((match = this.highlightRegex.exec(name)) !== null) {
-      const matchIdx = match.index;
+    for (const match of name.matchAll(this.highlightRegex)) {
+      const matchIdx = match.index!;
       if (matchIdx > idx) {
         parts.push(name.slice(idx, matchIdx));
       }
@@ -372,20 +407,21 @@ export class MapTable extends LitElement {
 
   private renderName(entry: NamedEntry, canHaveSubTable: boolean, loc?: string) {
     const inner = this.renderNameInner(entry.name);
-    const toggleAndTable = canHaveSubTable ? this.renderToggleAndTable(entry) : '';
     let span;
     if (loc) {
       const url = this.githubUrl + loc.replace(':', '#L');
-      span = html`<a href=${url} target="_blank" class="name-span">${inner}</a>`;
+      span = html`<a href="${url}" target="_blank" class="name-span">${inner}</a>`;
     } else {
       span = html`<span class="name-span">${inner}</span>`;
     }
-    return html`<td class="name">${span}${toggleAndTable}</td>`;
+    // Order: name, [+] toggle, references icon, then the expanded sub-table below
+    const [toggle, subTable] = canHaveSubTable ? this.renderToggleAndTable(entry) : [nothing, nothing];
+    return html`<td class="name">${span}${toggle}${this.renderRefIcon(entry)}${subTable}</td>`;
   }
 
   private renderDesc(desc?: string) {
     if (this.hiddenColumns.has(KEY_DESC)) {
-      return '';
+      return nothing;
     }
     return html`<td class="desc">${desc}</td>`
   }
@@ -403,7 +439,7 @@ export class MapTable extends LitElement {
 
   private renderCodeLength(entry: CodeEntry) {
     if (this.hiddenColumns.has(KEY_LEN)) {
-      return '';
+      return nothing;
     }
     const toolTip = entry.getToolTip();
     return html`<td class="length ${toolTip ? 'has-tooltip' : 'no-tooltip'}"
@@ -433,7 +469,7 @@ export class MapTable extends LitElement {
 
   private renderCodeParams(entry: CodeEntry) {
     if (this.hiddenColumns.has(KEY_PARAMS)) {
-      return '';
+      return nothing;
     }
     const params = entry.params;
     if (!params) {
@@ -446,7 +482,7 @@ export class MapTable extends LitElement {
 
   private renderCodeRet(entry: CodeEntry) {
     if (this.hiddenColumns.has(KEY_RET)) {
-      return '';
+      return nothing;
     }
     const ret = entry.return;
     if (!ret) {
@@ -468,14 +504,14 @@ export class MapTable extends LitElement {
 
   private renderStructOrUnionSize(size: number) {
     if (this.hiddenColumns.has(KEY_SIZE)) {
-      return '';
+      return nothing;
     }
     return html`<td class="size">${toHex(size)}</td>`;
   }
 
   private renderListEntry(entry: StructEntry | UnionEntry | EnumEntry) {
     const size = entry instanceof EnumEntry ?
-      '' : this.renderStructOrUnionSize(entry.size);
+      nothing : this.renderStructOrUnionSize(entry.size);
     const cellClass = entry instanceof EnumEntry ? 'vals' : 'vars';
     return html`<tr>
       ${size}
@@ -533,8 +569,8 @@ export class MapTable extends LitElement {
       .unions="${this.unions}"
       .enums="${this.enums}"
       .sizes="${this.sizes}"
-      .parentAddr="${parentAddr}"
-      .hiddenColumns="${this.hiddenColumns}">
+      .hiddenColumns="${this.hiddenColumns}"
+      .parentAddr="${parentAddr}">
     </map-table>`;
   }
 
@@ -561,6 +597,17 @@ export class MapTable extends LitElement {
     }
   }
 
+  private renderRefsDialog() {
+    const name = this.selectedRefName;
+    const entryRefs = name !== null ? this.refs[name] : undefined;
+    return html`<map-refs
+      .open="${entryRefs !== undefined}"
+      .entryName="${name ?? ''}"
+      .refs="${entryRefs ?? {}}"
+      @close="${this.closeRefs}">
+    </map-refs>`;
+  }
+
   override render() {
     return html`
       <table class="${this.isMainTable() ? 'main-table' : 'sub-table'}">
@@ -572,6 +619,7 @@ export class MapTable extends LitElement {
           return this.renderRow(item);
         })}
       </table>
+      ${this.renderRefsDialog()}
     `;
   }
 }

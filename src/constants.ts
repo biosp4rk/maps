@@ -65,6 +65,15 @@ export enum TableType {
 
 export const REGIONS = ['U', 'E', 'J', 'C'];
 
+export const URL_GAME = 'game';
+export const URL_MAP = 'map';
+export const URL_REGION = 'region';
+export const URL_FILTER = 'filter';
+export const URL_OPTIONS = 'options';
+
+export const OPT_STRUCTS_UNIONS = 's';
+export const OPT_ENUMS = 'e';
+
 export const GAME_SHORTCUTS: { [key: string]: string } = {
   f: 'mf',
   z: 'zm',
@@ -166,6 +175,12 @@ export const CATEGORIES: { [key: string]: string } = {
 //   'rle': 'RLE',
 //   'lz': 'LZ'
 // };
+
+export function tableHasAddr(tableType: TableType): boolean {
+  return tableType === TableType.RamList ||
+    tableType === TableType.CodeList ||
+    tableType === TableType.DataList;
+}
 
 export function getMainTableType(map: string): TableType {
   switch(map) {
