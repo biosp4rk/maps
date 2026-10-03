@@ -412,7 +412,7 @@ export class MapApp extends LitElement {
   }
 
   private collapseAll() {
-    this.shadowRoot?.querySelector('map-table')!.collapseAll();
+    this.shadowRoot?.querySelector('map-table')?.collapseAll();
   }
 
   private structsChangeHandler() {
@@ -458,8 +458,8 @@ export class MapApp extends LitElement {
       this.hiddenColumns.add(colName);
     }
 
-    const table = this.shadowRoot?.querySelector('map-table')!;
-    table.updateVisibleColumns();
+    const table = this.shadowRoot?.querySelector('map-table');
+    table?.updateVisibleColumns();
     this.requestUpdate();
   }
 

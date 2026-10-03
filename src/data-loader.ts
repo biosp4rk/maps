@@ -8,7 +8,7 @@ import {
   RefDict, DataEntry, CodeEntry, StructEntry, UnionEntry, EnumEntry, TypedefEntry
 } from './info-entry';
 
-const VERSION = 7;
+const VERSION = 8;
 
 /** The game-wide definitions, shared across maps and regions */
 export interface GameDefs {

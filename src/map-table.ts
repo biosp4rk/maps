@@ -289,7 +289,7 @@ export class MapTable extends LitElement {
       if (error instanceof Error) {
         msg = `${msg}: ${error.message}`;
       }
-      console.log(msg);
+      console.error(msg);
       lenStr = '?';
       toolTip = '';
     }
